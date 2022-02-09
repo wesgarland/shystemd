@@ -1,0 +1,10 @@
+#! /usr/bin/bash
+#
+# @file		jhournalctl
+# 		journalctl replacement for use with shystemctl
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
+echo NYI
+exit 1

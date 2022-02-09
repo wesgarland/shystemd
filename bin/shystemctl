@@ -1,0 +1,17 @@
+#! /bin/bash
+
+cd "`dirname $0`/.." || exit 1;
+cmd="$1"; shift
+args="$@"
+
+[ "$SYSTEMD_CONF_ROOT" ] || SYSTEMD_CONF_ROOT="`pwd`/system"
+export SYSTEMD_CONF_ROOT
+
+. etc/shystemd/default-env.incl
+
+if [ ! -f "usr/libexec/shystemd/$cmd" ]; then
+  echo "Unknown operation $cmd" >&2
+  exit 1
+fi
+
+. usr/libexec/shystemd/"$cmd" $args

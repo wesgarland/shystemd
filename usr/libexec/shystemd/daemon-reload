@@ -1,0 +1,10 @@
+# @file		daemon-reload
+# 		Command for shystemctl; scans the system directory and rebuilds the dependencies
+#
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
+. usr/lib/shystemd/parse-unit
+
+parseUnit system/sshd.service

@@ -1,0 +1,14 @@
+function parseUnit()
+{
+  local filename="$1"
+
+  sed -e 's/ *$//' < "$filename" |\
+  while read line
+  do
+    if [[ "$line" =~ ^(\[)(.*)(\])$ ]]; then
+      section="${BASH_REMATCH[2]}"
+      echo $section
+    fi
+  done < "$filename"
+}
+

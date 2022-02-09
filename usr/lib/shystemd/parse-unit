@@ -2,13 +2,31 @@ function parseUnit()
 {
   local filename="$1"
 
-  sed -e 's/ *$//' < "$filename" |\
-  while read line
-  do
-    if [[ "$line" =~ ^(\[)(.*)(\])$ ]]; then
-      section="${BASH_REMATCH[2]}"
-      echo $section
-    fi
-  done < "$filename"
+  echo "unit_basename=`basename $filename`"
+  echo "unit_dirname=`dirname $filename`"
+
+  egrep \
+    -ve "^[ 	     ]*#" \
+    "$filename" \
+  | sed \
+      -e "s/#[^'\"]*$//" \
+      -e 's/ *$//' \
+  | while read line
+    do
+      [ "$line" ] || continue
+      if [[ "$line" =~ ^(\[)(.*)(\])$ ]]; then
+        section="${BASH_REMATCH[2]}"
+        continue
+      fi
+
+      if [[ "$line" =~ ^([^=]*)(=)(.*)$ ]]; then
+        var="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[3]}"
+      else
+        echo "Warning: unrecognized line '${line}' in section ${secttion}" >&2
+      fi
+    
+      echo "${section}_${var}+=${value}";
+    done
 }
 

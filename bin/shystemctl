@@ -3,8 +3,9 @@
 cd "`dirname $0`/.." || exit 1;
 cmd="$1"; shift
 args="$@"
+[ ! "$cmd" ] && cmd="list-units"
 
-[ "$SYSTEMD_CONF_ROOT" ] || SYSTEMD_CONF_ROOT="`pwd`/system"
+[ "$SYSTEMD_CONF_ROOT" ] || SYSTEMD_CONF_ROOT="`pwd`/systemd"
 export SYSTEMD_CONF_ROOT
 
 . etc/shystemd/default-env.incl

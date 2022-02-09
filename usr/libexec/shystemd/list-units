@@ -1,0 +1,16 @@
+# @file		daemon-reload
+# 		Command for shystemctl; scans the system directory and rebuilds the dependencies
+#
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
+TAB="	"
+
+(cd "${SYSTEMD_CONF_ROOT}/system" && ls *.service)\
+| sed 's/\.service$//' \
+| while read unit
+  do
+    make unit="$unit" -f usr/lib/shystemd/service.mk status
+  done \
+| column -t -s"$TAB"

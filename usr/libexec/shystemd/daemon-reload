@@ -7,4 +7,18 @@
 
 . usr/lib/shystemd/parse-unit
 
-parseUnit system/sshd.service
+mkdir -p "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
+rm -f "${SYSTEMD_CONF_ROOT}"/shystemd-db/system/*
+
+(cd "${SYSTEMD_CONF_ROOT}" && ls system/*.service)\
+| while read file
+  do
+    parseUnit "${SYSTEMD_CONF_ROOT}/$file" > "${SYSTEMD_CONF_ROOT}/shystemd-db/$file.mk"
+  done
+
+(cd "${SYSTEMD_CONF_ROOT}/system" && ls *.service)\
+| sed 's/\.service$//' \
+| while read unit
+  do
+    make unit="$unit" -f usr/lib/shystemd/service.mk deps
+  done

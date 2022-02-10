@@ -1,0 +1,15 @@
+# @file		show-config
+# 		Dump the current shystemctl configuration.
+#
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
+compgen -e \
+| egrep 'SH?YSTEMD' \
+| while read var
+  do
+    eval value=\"\$$var\"
+    echo "$var=$value"
+  done
+echo "make=$make"

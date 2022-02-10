@@ -1,0 +1,17 @@
+# @file		help
+# 		Shows available shystemd commands
+#
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
+echo -n "Available commands: "
+(
+  cd "${SHYSTEMD_LIBEXEC_DIR}"
+  ls | grep '^[0-9a-z-]*$'
+)\
+| while read file
+  do
+    printf "%s " "$file"
+  done
+echo

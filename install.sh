@@ -82,8 +82,10 @@ if [ "`id -u`" != "0" ]; then
     && echo "Warning: you'll probably need root for this"
 fi
 
-if [ ! "${TRUST_ME}" ] && [ -f "${SHYSTEMD_PREFIX}/bin/systemctl" ]; then
+if [ ! "${TRUST_ME}" ] && [ -f "${SHYSTEMD_PREFIX}/bin/systemctl" ] && [ ! -h "${SHYSTEMD_PREFIX}/bin/systemctl" ]; then
   echo "${SHYSTEMD_PREFIX}/bin/systemctl appears to be real systemd; aborting install. Set TRUST_ME to bypass." >&2
+  sleep 1
+  exit 1
 fi
 
 cd "`dirname $argvZero`/."

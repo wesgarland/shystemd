@@ -1,18 +1,50 @@
 #! /bin/bash
-
-cd "`dirname $0`/.." || exit 1;
+#
+# @file         shystemctl
+#
+#               Systemctl-style frontend for shystemd commands. The commands
+#               themselves (daemon-reload, start, stop, list-units, etc), are
+#               stored individual files inside libexec directory.
+#
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#
+        
+# cwd is always bin
+export SHYSTEMD_BIN_DIR=`dirname "${BASH_SOURCE[0]}"`
+cd "${SHYSTEMD_BIN_DIR}"
 cmd="$1"; shift
 args="$@"
 [ ! "$cmd" ] && cmd="list-units"
 
-[ "$SYSTEMD_CONF_ROOT" ] || SYSTEMD_CONF_ROOT="`pwd`/systemd"
-export SYSTEMD_CONF_ROOT
+. ../etc/shystemd/default-env.incl
 
-. etc/shystemd/default-env.incl
-
-if [ ! -f "usr/libexec/shystemd/$cmd" ]; then
+if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
   echo "Unknown operation $cmd" >&2
   exit 1
 fi
 
-. usr/libexec/shystemd/"$cmd" $args
+locate()
+{
+  OLDIFS="$IFS"
+  for filename in $*
+  do
+    IFS=":"
+    for path in $PATH
+    do
+      if [ -f "${path}/${filename}" ]; then
+        echo "${path}/${filename}"
+        IFS="$OLDIFS"
+        return 0
+      fi
+    done
+  done
+
+  IFS="$OLDIFS"
+  return 1
+}
+
+[ ! "$make" ] && locate gmake && make=gmake
+[ ! "$make" ] && make=make
+
+. ${SHYSTEMD_LIBEXEC_DIR}/"$cmd" $args

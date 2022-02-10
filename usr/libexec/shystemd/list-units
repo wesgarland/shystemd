@@ -1,5 +1,5 @@
-# @file		daemon-reload
-# 		Command for shystemctl; scans the system directory and rebuilds the dependencies
+# @file		list-units
+# 		shows systemd units we can manage
 #
 # @author	Wes Garland, wes@kingsds.network
 # @date		Feb 2022
@@ -7,10 +7,11 @@
 
 TAB="	"
 
-(cd "${SYSTEMD_CONF_ROOT}/system" && ls *.service)\
+set -- $args
+(cd "${SYSTEMD_CONF_ROOT}/system" && ls $1.service)\
 | sed 's/\.service$//' \
 | while read unit
   do
-    make unit="$unit" -f usr/lib/shystemd/service.mk status
+   $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk status
   done \
 | column -t -s"$TAB"

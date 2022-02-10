@@ -1,1 +1,27 @@
-[ "$SYSTEMD_HOME_ROOT" ] || SYSTEMD_HOME_ROOT="${SYSTEMD_ROOT}/home"
+# @file		default-env.incl
+# 		Default environment variables for shystemd. Also Loads local-env.incl
+#               from the same directory if present, which is built by the installer.
+# @author	Wes Garland, wes@kignsds.entwork
+# @date		Feb 2022
+
+tmp=`pwd`
+cd .. || exit 111
+
+[ "$SYSTEMD_CONF_ROOT" ] || export SYSTEMD_CONF_ROOT="`pwd`/etc/systemd"
+export SHYSTEMD_ETC_DIR="`pwd`/etc/shystemd"
+export SHYSTEMD_BIN_DIR="`pwd`/bin"
+
+# Load real local-env.incl if present
+if [ -f "${SHYSTEMD_ETC_DIR}/local-env.incl" ]; then
+  . "${SHYSTEMD_ETC_DIR}/local-env.incl" ]
+else
+  # Fakes local-env.incl so that we can run from source dir
+  export SHYSTEMD_LIB_DIR="`pwd`/usr/lib/shystemd"
+  export SHYSTEMD_LIBEXEC_DIR="`pwd`/usr/libexec/shystemd"
+  export SYSTEMD_CONF_ROOT="`pwd`/systemd"
+fi
+
+cd "$tmp" || exit 111
+
+
+

@@ -1,11 +1,11 @@
 # @file		daemon-reload
-# 		Command for shystemctl; scans the system directory and rebuilds the dependencies
+# 		scans the system directory and rebuilds the dependencies
 #
 # @author	Wes Garland, wes@kingsds.network
 # @date		Feb 2022
 #
 
-. usr/lib/shystemd/parse-unit
+. "${SHYSTEMD_LIB_DIR}"/parse-unit
 
 mkdir -p "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
 rm -f "${SYSTEMD_CONF_ROOT}"/shystemd-db/system/*
@@ -20,5 +20,5 @@ rm -f "${SYSTEMD_CONF_ROOT}"/shystemd-db/system/*
 | sed 's/\.service$//' \
 | while read unit
   do
-    make unit="$unit" -f usr/lib/shystemd/service.mk deps
+    $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk deps
   done

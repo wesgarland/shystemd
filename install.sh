@@ -1,4 +1,10 @@
 #! /bin/bash -e
+#
+# @file         install.sh
+#               Installer for shystemd. Uses LSB layout when SHYSTEMD_PREFIX=/ (default)
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#
 
 argvZero="$0"
 
@@ -70,7 +76,15 @@ assertLocate()
 set -o pipefail
 
 echo "Installing shystem in ${SHYSTEMD_PREFIX}"
-[ "`id -u`" != "0" ] && echo "Warning: you'll probably need root for this"
+if [ "`id -u`" != "0" ]; then
+  what=`basename "${SHYSTEMD_PREFIX}"`
+  [ "$what" = "`find \"$where\"  -maxdepth 0 -uid 0 -type d -name / 2>/dev/null`" ] \
+    && echo "Warning: you'll probably need root for this"
+fi
+
+if [ ! "${TRUST_ME}" ] && [ -f "${SHYSTEMD_PREFIX}/bin/systemctl" ]; then
+  echo "${SHYSTEMD_PREFIX}/bin/systemctl appears to be real systemd; aborting install. Set TRUST_ME to bypass." >&2
+fi
 
 cd "`dirname $argvZero`/."
 myDir="`pwd`"
@@ -80,21 +94,30 @@ SHYSTEMD_PREFIX="`pwd`"
 cd "${myDir}"
 
 locate gmake && make=gmake || make=make
-locate gtar && make=gmake || tar=tar
+locate gtar && tar=gtar || tar=tar
 
 assertLocate daemon
 assertLocate $make
 assertLocate $tar
+assertLocate printf
 
-xcopy bin "${SHYSTEMD_PREFIX}"
 xcopy etc "${SHYSTEMD_PREFIX}"
+xcopy bin "${SHYSTEMD_PREFIX}"
 
 if [ "${SHYSTEMD_PREFIX}" = "/" ]; then
+  # LSB-style install
   xcopy usr "${SHYSTEMD_PREFIX}"
+  cat > "${SHYSTEMD_PREFIX}/local-env.incl" <<EOF
+  export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/usr/lib/shystemd"
+  export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/usr/libexec/shystemd"
+EOF
 else
+  # BSD-style install
   cd usr
   xcopy * "${SHYSTEMD_PREFIX}"
   cd ..
+  export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/lib/shystemd"
+  export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/libexec/shystemd"
 fi
 
 link "${SHYSTEMD_PREFIX}"/bin/shystemctl "${SHYSTEMD_PREFIX}"/bin/systemctl

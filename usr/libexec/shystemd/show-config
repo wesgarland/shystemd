@@ -5,6 +5,9 @@
 # @date		Feb 2022
 #
 
+. "${SHYSTEMD_LIB_DIR}"/for-each-unit
+
+# Show global env
 compgen -e \
 | egrep 'SH?YSTEMD' \
 | while read var
@@ -13,14 +16,16 @@ compgen -e \
     echo "$var=$value"
   done
 echo "make=$make"
+$make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk show-config
 
-. "${SHYSTEMD_LIB_DIR}"/for-each-unit
-
+# Show per-unit config
 dump()
 {
   unit="$1"
   echo
   echo "********* $unit *********"
-  $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk debug
+  $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk show-unit-config
 }
 forEachUnit dump
+
+echo

@@ -10,26 +10,40 @@
 
 systemDir=$(SYSTEMD_CONF_ROOT)/shystemd-db/system
 
-include $(systemDir)/$(unit).service.mk
--include $(systemDir)/$(unit).service.deps
+ifdef unit
+  include $(systemDir)/$(unit).service.mk
+  -include $(systemDir)/$(unit).service.deps
+endif
+
+Service_User  ?= nobody
+Service_Group ?= nogroup
+Service_WorkingDirectory ?= /tmp
 
 pidfile=$(SYSTEMD_CONF_ROOT)/shystemd-db/system/$(unit).pid
-daemon=daemon -N -F $(pidfile)
+daemon=daemon -n $(unit) -N -F $(pidfile)
+launch=$(daemon) -u$(Service_User):$(Service_Group) -D$(Service_WorkingDirectory)
 
-#-u user:group
-#-D directory
-#-r is respawn
+ifeq ($(Service_Restart),always)
+  launch += -r
+endif
+ifdef Service_StartLimitBurst
+  launch += --limit=$(Service_StartLimitBurst)
+endif
+ifdef Service_StartLimitIntervalSec
+  launch += --delay=$(Service_StartLimitIntervalSec)
+endif
+
 #-l logfile or syslog level
+#-b debug log
 #--running - check is running
 #--stop - kill it
 #--list
 #--signal - send signal
 
-ifeq ($(Service_Type),oneshot)
-  launch=$(daemon)
-else
-  launch=$(daemon) -r
-endif
+# simple - blind launch
+# oneshot - not successful unless process has exit=0
+#ifeq ($(Service_Type),oneshot)  simple
+#endif
 
 status:
 	@printf "%s\t%s\n" "$(unit_basename)" "$(Unit_Description)"
@@ -41,11 +55,16 @@ deps:
 	@$(shell $(foreach dep, $(Install_WantedBy), echo stop: stop-$(unit) >> $(systemDir)/$(dep).deps;))
 	@true
 
+show-config:
+	@echo launch="$(launch)"
+
 # Make this target a dependency to dump info before other target
 debug:
 	@echo "unit=$(unit)"
 	@echo "systemDir=$(systemDir)"
 	@cat $(systemDir)/$(unit).service.mk
+
+show-unit-config: debug show-config
 
 start:  
 	@echo Starting unit $(unit)
@@ -53,3 +72,12 @@ start:
 
 start-%:
 	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+
+stop:
+	$(daemon) --stop
+
+stop-%:
+	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+
+running:
+	$(daemon) --running && echo RUNNING

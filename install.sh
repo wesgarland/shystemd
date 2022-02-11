@@ -75,7 +75,7 @@ assertLocate()
 
 set -o pipefail
 
-echo "Installing shystem in ${SHYSTEMD_PREFIX}"
+echo "Installing shystemd in ${SHYSTEMD_PREFIX}"
 if [ "`id -u`" != "0" ]; then
   what=`basename "${SHYSTEMD_PREFIX}"`
   [ "$what" = "`find \"$where\"  -maxdepth 0 -uid 0 -type d -name / 2>/dev/null`" ] \
@@ -109,9 +109,12 @@ xcopy bin "${SHYSTEMD_PREFIX}"
 if [ "${SHYSTEMD_PREFIX}" = "/" ]; then
   # LSB-style install
   xcopy usr "${SHYSTEMD_PREFIX}"
+  echo mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
+  mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
   cat > "${SHYSTEMD_PREFIX}/local-env.incl" <<EOF
   export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/usr/lib/shystemd"
   export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/usr/libexec/shystemd"
+  export JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
 EOF
 else
   # BSD-style install
@@ -120,9 +123,9 @@ else
   cd ..
   export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/lib/shystemd"
   export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/libexec/shystemd"
+  echo mkdir -m1777 -p "${SHYSTEMD_PREFIX}/shystemd-journals"
+  mkdir -m1777 -p "${SHYSTEMD_PREFIX}/shystemd-journals"
 fi
 
 link "${SHYSTEMD_PREFIX}"/bin/shystemctl "${SHYSTEMD_PREFIX}"/bin/systemctl
 link "${SHYSTEMD_PREFIX}"/bin/jhournalctl "${SHYSTEMD_PREFIX}"/bin/journalctl
-
-

@@ -10,4 +10,5 @@ Service_WorkingDirectory 	?= $(SHYSTEMD_PRIVATE_TMP_ROOT)
 Service_KillSignal 		?= TERM
 Service_RuntimeDirectoryMode 	?= 0750
 Service_RuntimeDirectory     	?= nobody
-
+Service_StandardOutput		?= journal
+Service_StandardError		?= journal

@@ -10,6 +10,7 @@ cd .. || exit 111
 [ "$SYSTEMD_CONF_ROOT" ] || export SYSTEMD_CONF_ROOT="`pwd`/etc/systemd"
 export SHYSTEMD_ETC_DIR="`pwd`/etc/shystemd"
 export SHYSTEMD_BIN_DIR="`pwd`/bin"
+export JHOURNALD_LOG_DIR="`pwd`/shystemd-journals"
 
 # Load real local-env.incl if present
 if [ -f "${SHYSTEMD_ETC_DIR}/local-env.incl" ]; then
@@ -22,6 +23,3 @@ else
 fi
 
 cd "$tmp" || exit 111
-
-
-

@@ -15,7 +15,7 @@ ifdef unit
 endif
 include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 
-# Figure out basic parameters for running daemon
+# Basic parameters for running daemon
 daemon=$(sudo) daemon -n $(unit) -N
 ifdef Service_PIDFile
   pidfile = $(Service_PIDFile)
@@ -25,6 +25,8 @@ endif
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
   daemon += -F $(pidfile)
 endif
+
+# Permissions for running daemon
 ifdef Service_User
   ifneq ($(Service_User),$(shell whoami))
     sudo=sudo -E --user=$(Service_User)
@@ -41,11 +43,14 @@ ifdef ServiceGroup
   endif
 endif
 
-# Figure out daemon parameters to start services
+# Basic Parameters to start services
 launch = $(daemon) -D$(Service_WorkingDirectory)
 launch += $(foreach assignment, $(Service_Environment),-e "$(assignment)")
 ifeq ($(Service_Restart),always)
   launch += -r
+endif
+ifeq ($(Service_Type),oneshot)
+  launch += '--foreground'
 endif
 ifdef Service_StartLimitBurst
   launch += --limit=$(Service_StartLimitBurst)
@@ -53,9 +58,22 @@ endif
 ifdef Service_StartLimitIntervalSec
   launch += --delay=$(Service_StartLimitIntervalSec)
 endif
-ifeq ($(Service_Type),oneshot)
-  launch += '--foreground'
+
+# Logging
+ifeq ($(Service_StandardOutput),syslog)
+  launch += --stdout=local7.debug -l local7.info
+else ifeq ($(Service_StandardOutput),journal)
+  launch += --stdout=$(JHOURNALD_LOG_DIR)/$(unit).log -l $(JHOURNALD_LOG_DIR)/$(unit).log
 endif
+ifeq ($(Service_StandardError),syslog)
+  launch += --stdout=local7.notice -b local7.error
+else ifeq ($(Service_StandardError),journal)
+  launch += --stderr=$(JHOURNALD_LOG_DIR)/$(unit).log -b $(JHOURNALD_LOG_DIR)/$(unit).log
+endif
+
+# Path-based dependenciesi
+#start-deps += $(addprefix exists-,$(filter-out !%,$(Unit_ConditionPathExists)))
+#start-deps += $(addprefix not-exists-,$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists))))
 
 # Try to emulate PrivateTmp with extra deps and TMPDIR - not very complete (yet?)
 # Future: investigate FireJail for PrivateTmp, PrivateBin, etc
@@ -64,15 +82,6 @@ ifdef Service_PrivateTmp
   stop-deps += rm-private-tmp
   launch += -e "TMPDIR=$(shell head -1 $(patsubst %.pid,%.tmpdir,$(pidfile)))"
 endif
-
-#-l logfile or syslog level
-#-b debug log
-#--running - check is running
-#--list
-#--signal - send signal
-
-# simple - blind launch
-# oneshot - not successful unless process has exit=0
 
 status:
 	@printf "%s\t%s\n" "$(unit_basename)" "$(Unit_Description)"
@@ -95,6 +104,9 @@ debug:
 	@echo "pidfile=$(pidfile)"
 	@echo "systemDir=$(systemDir)"
 	@cat $(systemDir)/$(unit).service.mk
+	@echo start deps: $(start-deps)
+	@echo Unit_ConditionPathExists=$(Unit_ConditionPathExists)
+#XXX Unit_after
 
 show-unit-config: debug show-config
 
@@ -103,8 +115,9 @@ running:
 	$(daemon) --running && echo RUNNING
 
 start-deps: $(start-deps)
+
 # Start a unit
-start: $(start-deps)
+start: exists not-exists $(start-deps)
 	@echo Starting unit $(unit)
 	$(launch) $(Service_ExecStart)
 ifeq ($(Service_RemainAfterExit),yes)
@@ -140,6 +153,17 @@ stop-%:
 	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 start-%:
 	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+
+exists: need=$(filter-out !%,$(Unit_ConditionPathExists))
+exists: have=$(wildcard $(need))
+exists:
+	@echo EXISTS "$(need)"
+	@test "$(need)" = "$(have)"
+not-exists: dontwant=$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists)))
+not-exists: have=$(wildcard $(dontwant))
+not-exists:
+	@echo "Can't start unit $(unit) due to presence of $(dontwant)" >&2
+	@test -s "$have"
 
 mk-private-tmp rm-private-tmp: ptmpdirLoc=$(patsubst %.pid,%.tmpdir,$(pidfile))
 mk-private-tmp:

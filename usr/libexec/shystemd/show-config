@@ -13,3 +13,14 @@ compgen -e \
     echo "$var=$value"
   done
 echo "make=$make"
+
+. "${SHYSTEMD_LIB_DIR}"/for-each-unit
+
+dump()
+{
+  unit="$1"
+  echo
+  echo "********* $unit *********"
+  $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk debug
+}
+forEachUnit dump

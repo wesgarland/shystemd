@@ -5,16 +5,11 @@
 # @date		Feb 2022
 #
 
-set -- "$args"
+. "${SHYSTEMD_LIB_DIR}"/for-each-unit
 
-while [ "$1" ]
-do
-  unitGlob="$1"
-  shift
-  (cd "${SYSTEMD_CONF_ROOT}/system" && ls $unitGlob.service)\
-  | sed 's/\.service$//' \
-  | while read unit
-    do
-      $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
-    done
-done
+start()
+{
+  $make unit="$1" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+}
+
+forEachUnit start

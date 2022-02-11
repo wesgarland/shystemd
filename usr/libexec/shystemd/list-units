@@ -8,7 +8,7 @@
 TAB="	"
 
 set -- $args
-(cd "${SYSTEMD_CONF_ROOT}/system" && ls $1.service)\
+(cd "${SYSTEMD_CONF_ROOT}/system" && ls ${1:-*}.service)\
 | sed 's/\.service$//' \
 | while read unit
   do

@@ -7,8 +7,16 @@
 #               multiple words in the resultant make variable. Section names
 #               are prepended to variable names for namespacing reasons.
 #
-#               Special variables, unit_basename and unit_dirname are emitted
-#               to help make know the actual source of its configuration.
+#               Extra variables about the unit start with unit_, not Unit_. Some
+#               variables include:
+#
+#               unit             vpn@wes   # provided on command line
+#               unit_fullname    vpn@wes.service
+#               unit_instance    wes
+#               unit_filename    /etc/systemd/service/vpn.service
+#               unit_prefix      vpn
+#
+#               @see man systemd.unit
 #
 # @author       Wes Garland, wes@kingsds.network
 # @date         Feb 2022
@@ -16,11 +24,20 @@
 function parseUnit()
 {
   local filename="$1"
+  
+# Declare variables for use in specifier expansion
+  if [[ `dirname "$filename"` =~ (^[^@]*@)([^.]*) ]]; then
+    echo "unit_instance=${BASH_REMATCH[2]}"
+  fi
+cat <<EOF
+unit_filename="${filename}"
+ifdef unit_instance
+  unit_fullname=\$(unit).service
+else
+endif
+EOF
 
-  echo "unit_basename=`basename $filename`"
-  echo "unit_dirname=`dirname $filename`"
-
-  egrep \
+egrep \
     -ve "^[ 	     ]*#" \
     "$filename" \
   | sed \
@@ -44,6 +61,22 @@ function parseUnit()
         echo "Warning: unrecognized line '${line}' in section ${secttion}" >&2
       fi
     
-      echo "${section}_${var}+=${value}";
+      echo -n "${section}_${var}+="
+
+      # Unescape 
+      echo "${value}" \
+        | sed \
+          -e 's/%I/$(unit_instance)/g' \
+          -e 's/%i/$(unescape $(unit_instance))/g' \
+          -e 's/%N/$(unit_fullname)/g' \
+          -e 's/%n/$(unsecape $(unit_fullname)/g' \
+          -e 's/%P/$(unit_prefix)/g' \
+          -e 's/%p/$(unsecape $(unit_prefix)/g' \
+          -e 's;%f;/$(unescape $(if $(unit_instance),$(unit_instance),$(unit_prefix)));g' \
+          -e 's/%u/$(shell whoami)/g' \
+          -e 's/%b/$(shell uuidgen)/g' \
+          -e 's/%H/$(shell hostname)/g' \
+          -e 's/%v/$(shell uname -r)/g' \
+          -e 's/%%/%/g'
     done
 }

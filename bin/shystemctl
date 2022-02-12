@@ -68,5 +68,4 @@ fi
 export SHYSTEMD_SCRATCH_DIR="${SYSTEMD_CONF_ROOT}/shystemd-db/system"
 
 rm -f "${SHYSTEMD_SCRATCH_DIR}"/after-*.sema
-cd ..
 . "${SHYSTEMD_LIBEXEC_DIR}/$cmd" $args

@@ -1,8 +1,9 @@
-# @file		restart
-# 		restart units - stop and then start
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file       restart
+#             restart units - stop and then start
 #
-# @author	Wes Garland, wes@kingsds.network
-# @date		Feb 2022
+# @author     Wes Garland, wes@kingsds.network
+# @date       Feb 2022
 #
 
 . "${SHYSTEMD_LIB_DIR}"/for-each-unit

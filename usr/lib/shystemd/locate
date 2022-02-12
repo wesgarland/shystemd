@@ -1,0 +1,27 @@
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file         locate
+#
+#               Determine if all the files are on the path and executable.
+#
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#
+locate()
+{
+  OLDIFS="$IFS"
+  for filename in $*
+  do
+    IFS=":"
+    for path in $PATH
+    do
+      if [ -f "${path}/${filename}" ]; then
+        echo "${path}/${filename}"
+        IFS="$OLDIFS"
+        return 0
+      fi
+    done
+  done
+
+  IFS="$OLDIFS"
+  return 1
+}

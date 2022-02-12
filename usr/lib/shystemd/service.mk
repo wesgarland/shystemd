@@ -24,9 +24,18 @@ include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 # used with these from parse-unit
 unescape = $(shell printf -- '$(1)' | sed 's;-;/;g')
 
+ifdef SHYSTEMD_DRY_RUN
+  daemonCmd=@echo \> daemon
+  rm=@echo \> rm 
+  touch=@echo \> touch
+else
+  daemonCmd=daemon
+  rm=rm
+  touch=touch
+endif
 
 # Basic parameters for running daemon
-daemon=$(sudoRoot) daemon -n $(unit) -N
+daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -N
 ifdef Service_PIDFile
   pidfile = $(Service_PIDFile)
 else
@@ -99,11 +108,13 @@ status:
 
 .PHONY: deps
 deps:
-#	@echo Building deps - $(unit) is needed by $(Install_WantedBy)
-	@$(shell $(foreach dep, $(Install_WantedBy), echo start: start-$(unit_prefix) >> $(systemDir)/$(dep).deps;))
-	@$(shell $(foreach dep, $(Install_WantedBy), echo stop:  stop-$(unit_prefix)  >> $(systemDir)/$(dep).deps;))
-	@$(shell $(foreach dep, $(Unit_After), echo start: start-$(dep) >> $(systemDir)/$(unit_prefix).deps;))
-	@$(shell $(foreach dep, $(Unit_After), echo stop:  stop-$(dep)  >> $(systemDir)/$(unit_prefix).deps;))
+ifdef SHYSTEMD_DEBUG
+	@echo Building deps - $(unit) is needed by $(Install_WantedBy)
+endif
+	$(shell $(foreach dep, $(Install_WantedBy), echo start: start-$(unit_prefix) >> $(systemDir)/$(dep).deps;))
+	$(shell $(foreach dep, $(Install_WantedBy), echo stop:  stop-$(unit_prefix)  >> $(systemDir)/$(dep).deps;))
+	$(shell $(foreach dep, $(Unit_After), echo start: start-$(dep) >> $(systemDir)/$(unit_prefix).deps;))
+	$(shell $(foreach dep, $(Unit_After), echo stop:  stop-$(dep)  >> $(systemDir)/$(unit_prefix).deps;))
 	@true
 
 show-config:
@@ -128,72 +139,73 @@ show-unit-config: debug show-config
 running:
 	$(daemon) --running && echo RUNNING
 
-# Start a unit
+# Add extra deps to start for ConditionPathExists
 ifdef Unit_ConditionPathExists
 start: exists not-exists
-endif
+# Dependency to block starting if file in Unit_ConditionPathExists is missing
+exists: need=$(filter-out !%,$(Unit_ConditionPathExists))
+exists: have=$(wildcard $(need))
+exists:
+	test "$(need)" = "$(have)"
+
+# Dependency to block starting if !file in Unit_ConditionPathExists exists
+not-exists: dontwant=$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists)))
+not-exists: have=$(wildcard $(dontwant))
+not-exists:
+	test -s $(strip $(have)) || echo "Can't start unit $(unit) due to presence of $(dontwant)" >&2
+	test -s $(strip $(have))
+endif #Unit_ConditionPathExists
+
+# Start a unit
 start: $(start-deps)
 	@echo Starting unit $(unit)
-	@$(launch) $(Service_ExecStart)
+	$(launch) $(Service_ExecStart)
 ifeq ($(Service_RemainAfterExit),yes)
-	@touch $(scratchDir)/$(unit).ran
+	$(touch) $(scratchDir)/$(unit).ran
 endif
 
 # Stop a unit
 # Note: Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
 stop: $(stop-deps)
 ifeq ($(Service_Type),forking)
-	@$(sudoUser) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
+	$(sudoUser) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
 else
-	@$(daemon) --signal=$(Service_KillSignal) 2>/dev/null || true
-	@$(daemon) --stop
-	rm -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
+	$(daemon) --signal=$(Service_KillSignal) 2>/dev/null || true
+	$(daemon) --stop
+	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
 endif
 
 # Restart a unit
 restart:
-	@$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
-	@$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
 # Pattern rules start and stop dependencies via submake. Dependencies are listed
 # in *.deps files, their target names begin with start- and stop-, and are built
 # by daemon-reload.
 stop-%:
-	@$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 start-%:
-	@$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
-# Dependency to block starting if file in Unit_ConditionPathExists is missing
-exists: need=$(filter-out !%,$(Unit_ConditionPathExists))
-exists: have=$(wildcard $(need))
-exists:
-	@test "$(need)" = "$(have)"
-
-# Dependency to block starting if !file in Unit_ConditionPathExists exists
-not-exists: dontwant=$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists)))
-not-exists: have=$(wildcard $(dontwant))
-not-exists:
-	@test -s $(strip $(have)) || echo "Can't start unit $(unit) due to presence of $(dontwant)" >&2
-	@test -s $(strip $(have))
-
+ifndef SHYSTEMD_DRY_RUN
 # Beware - private root is incomplete and untested
 # Alternate pointer implementation idea: use a symlink and dereference with realpath
 privateRootPtr=$(scratchDir)/$(unit).privateRoot
 mk-private-root:
-	@$(sudoRoot) mktemp -d $(SHYSTEMD_PRIVATE_TMP_ROOT).$(unit).XXXXXX > $(privateRootPtr)
-	@$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))
+	$(sudoRoot) mktemp -d $(SHYSTEMD_PRIVATE_TMP_ROOT).$(unit).XXXXXX > $(privateRootPtr)
+	$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))
 mk-private-tmp: privateRoot=$(shell head -1 $(privateRootPtr))
 mk-private-tmp: mk-private-root
-	@$(sudoRoot) mkdir -m1777 $(shell head -1 $(privateRootPtr))/tmp
-	@$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))/tmp
+	$(sudoRoot) mkdir -m1777 $(shell head -1 $(privateRootPtr))/tmp
+	$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))/tmp
 rm-private-tmp: privateRoot=$(shell head -1 $(privateRootPtr))
 rm-private-tmp:
 	@!test -z $(strip $(privateRoot))
 	@test $(privateRoot) != /
-	@$(sudoUser) rm -rf $(privateRoot)/tmp
+	$(sudoUser) rm -rf $(privateRoot)/tmp
 rm-private-root: privateRoot=$(shell head -1 $(privateRootPtr))
 rm-private-root: rm-private-tmp
-	@$(sudoRoot) rmdir $(privateRoot)
-	@$(sudoRoot) rm $(privateRootPtr)
-
-
+	$(sudoRoot) rmdir $(privateRoot)
+	$(sudoRoot) rm $(privateRootPtr)
+endif #SHYSTEMD_DRY_RUN

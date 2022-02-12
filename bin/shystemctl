@@ -1,4 +1,5 @@
 #! /bin/bash
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 #
 # @file         shystemctl
 #
@@ -10,62 +11,21 @@
 # @date         Feb 2022
 #
         
-# cwd is always bin
 export SHYSTEMD_BIN_DIR=`dirname "${BASH_SOURCE[0]}"`
-cd "${SHYSTEMD_BIN_DIR}"
+
+cd "${SHYSTEMD_BIN_DIR}"/..
+. etc/shystemd/default-env.incl
+cd "${SHYSTEMD_BIN_DIR}" # cwd is always bin
+. "${SHYSTEMD_LIB_DIR}"/locate
+. "${SHYSTEMD_LIB_DIR}"/find-make
+
 cmd="$1"; shift
 args="$@"
 [ ! "$cmd" ] && cmd="list-units"
-
-. ../etc/shystemd/default-env.incl
 
 if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
   echo "Unknown operation $cmd" >&2
   exit 1
 fi
 
-locate()
-{
-  OLDIFS="$IFS"
-  for filename in $*
-  do
-    IFS=":"
-    for path in $PATH
-    do
-      if [ -f "${path}/${filename}" ]; then
-        echo "${path}/${filename}"
-        IFS="$OLDIFS"
-        return 0
-      fi
-    done
-  done
-
-  IFS="$OLDIFS"
-  return 1
-}
-
-[ ! "$make" ] && locate gmake && make=gmake
-[ ! "$make" ] && make=make
-
-if [[ `make --version | grep '^GNU Make' | head -1` =~ (GNU Make *)([0-9]*).([0-9]*) ]]; then
-  if [ "${BASH_REMATCH[2]}" -lt "3" ]; then
-    echo "$make is too old; ${BASH_REMATCH} < GNU Make 3" >&2
-    exit 113
-  fi
-  if [ "${BASH_REMATCH[2]}" -eq "3" ] && [ "${BASH_REMATCH[3]}" -lt "81" ]; then
-    echo "$make is too old; ${BASH_REMATCH} < GNU Make 3.81" >&2
-    exit 114
-  fi
-else
-  echo "$make is not GNU Make >= 3.81" >&2
-  exit 112
-fi
-
-if [ ! "${SHYSTEMD_NO_PARALLELISM}" ]; then
-  make="$make -j${SHYSTEMD_PARALLELISM:-10}"
-fi
-
-export SHYSTEMD_SCRATCH_DIR="${SYSTEMD_CONF_ROOT}/shystemd-db/system"
-
-rm -f "${SHYSTEMD_SCRATCH_DIR}"/after-*.sema
-. "${SHYSTEMD_LIBEXEC_DIR}/$cmd" $args
+(. "${SHYSTEMD_LIBEXEC_DIR}/$cmd")

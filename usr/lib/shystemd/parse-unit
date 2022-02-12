@@ -1,3 +1,18 @@
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file         parse-unit
+#
+#               Parse a systemd unit file, emitting variables for GNU Make
+#               to consume. Variables are declared by continual concatenation
+#               starting from the empty string, so multiple declarations become
+#               multiple words in the resultant make variable. Section names
+#               are prepended to variable names for namespacing reasons.
+#
+#               Special variables, unit_basename and unit_dirname are emitted
+#               to help make know the actual source of its configuration.
+#
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#
 function parseUnit()
 {
   local filename="$1"
@@ -14,11 +29,14 @@ function parseUnit()
   | while read line
     do
       [ "$line" ] || continue
+
+      # Recognize sections
       if [[ "$line" =~ ^(\[)(.*)(\])$ ]]; then
         section="${BASH_REMATCH[2]}"
         continue
       fi
 
+      # Recognize variables
       if [[ "$line" =~ ^([^=]*)(=)(.*)$ ]]; then
         var="${BASH_REMATCH[1]}"
         value="${BASH_REMATCH[3]}"
@@ -29,4 +47,3 @@ function parseUnit()
       echo "${section}_${var}+=${value}";
     done
 }
-

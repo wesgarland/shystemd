@@ -4,7 +4,7 @@ SHYSTEMD_PRIVATE_TMP_ROOT ?= /tmp
 
 # Systemctl defaults
 Service_User  			?= nobody
-Service_Group 			?= nogroup
+Service_Group 			?= nobody
 Service_Type 			?= $(if $(Service_ExecStart),simple,oneshot)
 Service_WorkingDirectory 	?= $(SHYSTEMD_PRIVATE_TMP_ROOT)
 Service_KillSignal 		?= TERM

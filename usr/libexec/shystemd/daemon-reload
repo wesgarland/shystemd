@@ -1,5 +1,6 @@
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 # @file		daemon-reload
-# 		scans the system directory and rebuilds the dependencies
+# 		    scans the system directory and rebuilds the dependencies
 #
 # @author	Wes Garland, wes@kingsds.network
 # @date		Feb 2022
@@ -7,15 +8,17 @@
 
 . "${SHYSTEMD_LIB_DIR}"/parse-unit
 
-mkdir -p "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
-rm -f "${SYSTEMD_CONF_ROOT}"/shystemd-db/system/*
+rm -rf "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
+mkdir -m1777 -p "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
 
+# Parse the systemd unit file into a makefile
 (cd "${SYSTEMD_CONF_ROOT}" && ls system/*.service)\
 | while read file
   do
     parseUnit "${SYSTEMD_CONF_ROOT}/$file" > "${SYSTEMD_CONF_ROOT}/shystemd-db/$file.mk"
   done
 
+# Make dependencies
 (cd "${SYSTEMD_CONF_ROOT}/system" && ls *.service)\
 | sed 's/\.service$//' \
 | while read unit

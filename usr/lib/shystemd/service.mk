@@ -8,7 +8,8 @@
 # @date		Feb 2022
 #
 
-systemDir=$(SYSTEMD_CONF_ROOT)/shystemd-db/system
+systemDir ?= $(SHYSTEMD_SCRATCH_DIR)
+scratchDir ?= $(SHYSTEMD_SCRATCH_DIR)
 ifdef unit
   include $(systemDir)/$(unit).service.mk
   -include $(systemDir)/$(unit).service.deps
@@ -16,41 +17,46 @@ endif
 include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 
 # Basic parameters for running daemon
-daemon=$(sudo) daemon -n $(unit) -N
+daemon=$(sudoRoot) daemon -n $(unit) -N
 ifdef Service_PIDFile
   pidfile = $(Service_PIDFile)
 else
-  pidfile = $(SYSTEMD_CONF_ROOT)/shystemd-db/system/$(unit).pid
+  pidfile = $(scratchDir)/$(unit).pid
 endif
+
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
   daemon += -F $(pidfile)
 endif
 
-# Permissions for running daemon
+# Permissions for running daemon. If we are not already running as the unit's
+# correct user, the variables sudoRoot and sudoUser are defined, otherwise blank.
+# sudoUser is the sudo command to become the unit's user. sudoRoot is the sudo
+# command to become root, the command using sudoRoot must drop perms itself.
 ifdef Service_User
-  ifneq ($(Service_User),$(shell whoami))
-    sudo=sudo -E --user=$(Service_User)
+  ifneq ($(Service_User),$(shell whoami)) 
+    sudoUser=sudo -E --user=$(Service_User)
+    sudoRoot=sudo -E
     daemon += -u$(Service_User):$(Service_Group)
-endif
+  endif
 endif
 ifdef ServiceGroup
   ifndef $(findstring $(ServiceGroup),$(shell groups))
     ifndef sudo
-      sudo=sudo -E
+      sudoRoot=sudo -E
       daemon += -u$(Service_User):$(Service_Group)
     endif
-    sudo += --group=$(Service_Group)
+    sudoUser += --group=$(Service_Group)
   endif
 endif
 
-# Basic Parameters to start services
+# Basic Parameters to start / monitor services
 launch = $(daemon) -D$(Service_WorkingDirectory)
 launch += $(foreach assignment, $(Service_Environment),-e "$(assignment)")
 ifeq ($(Service_Restart),always)
-  launch += -r
+  launch += --respawn
 endif
 ifeq ($(Service_Type),oneshot)
-  launch += '--foreground'
+  launch += --foreground
 endif
 ifdef Service_StartLimitBurst
   launch += --limit=$(Service_StartLimitBurst)
@@ -71,16 +77,12 @@ else ifeq ($(Service_StandardError),journal)
   launch += --stderr=$(JHOURNALD_LOG_DIR)/$(unit).log -b $(JHOURNALD_LOG_DIR)/$(unit).log
 endif
 
-# Path-based dependenciesi
-#start-deps += $(addprefix exists-,$(filter-out !%,$(Unit_ConditionPathExists)))
-#start-deps += $(addprefix not-exists-,$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists))))
-
 # Try to emulate PrivateTmp with extra deps and TMPDIR - not very complete (yet?)
 # Future: investigate FireJail for PrivateTmp, PrivateBin, etc
 ifdef Service_PrivateTmp
   start-deps += mk-private-tmp
   stop-deps += rm-private-tmp
-  launch += -e "TMPDIR=$(shell head -1 $(patsubst %.pid,%.tmpdir,$(pidfile)))"
+  launch += -e "TMPDIR=$(shell head -1 $(scratchDir)/$(unit).privateRoot)"
 endif
 
 status:
@@ -90,23 +92,26 @@ status:
 deps:
 #	@echo Building deps - $(unit) is needed by $(Install_WantedBy)
 	@$(shell $(foreach dep, $(Install_WantedBy), echo start: start-$(unit) >> $(systemDir)/$(dep).deps;))
-	@$(shell $(foreach dep, $(Install_WantedBy), echo stop: stop-$(unit) >> $(systemDir)/$(dep).deps;))
+	@$(shell $(foreach dep, $(Install_WantedBy), echo stop:  stop-$(unit)  >> $(systemDir)/$(dep).deps;))
+	@$(shell $(foreach dep, $(Unit_After), echo start: start-$(dep) >> $(systemDir)/$(unit).deps;))
+	@$(shell $(foreach dep, $(Unit_After), echo stop:  stop-$(dep)  >> $(systemDir)/$(unit).deps;))
 	@true
 
 show-config:
+	@echo pwd=$(shell pwd)	
 	@echo launch="$(launch)"
 	@echo "Service_User=$(Service_User)"
-	@echo "sudo=$(sudo)"
+	@echo "sudoUser=$(sudoUser)"
 
 # Make this target a dependency to dump info before other target
 debug:
 	@echo "unit=$(unit)"
 	@echo "pidfile=$(pidfile)"
 	@echo "systemDir=$(systemDir)"
+	@echo "whoami=$(shell whoami)"
 	@cat $(systemDir)/$(unit).service.mk
 	@echo start deps: $(start-deps)
 	@echo Unit_ConditionPathExists=$(Unit_ConditionPathExists)
-#XXX Unit_after
 
 show-unit-config: debug show-config
 
@@ -114,65 +119,72 @@ show-unit-config: debug show-config
 running:
 	$(daemon) --running && echo RUNNING
 
-start-deps: $(start-deps)
-
 # Start a unit
-start: exists not-exists $(start-deps)
-	@echo Starting unit $(unit)
-	$(launch) $(Service_ExecStart)
-ifeq ($(Service_RemainAfterExit),yes)
-	touch $(patsubst %.pid,%.ran,$(pidfile))
+ifdef Unit_ConditionPathExists
+start: exists not-exists
 endif
-ifdef sudo
-	sudo -k
+start: $(start-deps)
+	@echo Starting unit $(unit)
+	$(launch) -X "$(Service_ExecStart)"
+ifeq ($(Service_RemainAfterExit),yes)
+	touch $(scratchDir)/$(unit).ran
 endif
 
 # Stop a unit
 # Note: Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
 stop: $(stop-deps)
 ifeq ($(Service_Type),forking)
-	$(sudo) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
+	$(sudoUser) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
 else
 	$(daemon) --signal=$(Service_KillSignal) 2>/dev/null || true
-	rm -f $(patsubst %.pid,%.ran,$(pidfile))
 	$(daemon) --stop
-endif
-ifdef sudo
-	sudo -k
+	rm -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
 endif
 
 # Restart a unit
 restart:
-	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
-	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
 # Pattern rules start and stop dependencies via submake. Dependencies are listed
 # in *.deps files, their target names begin with start- and stop-, and are built
 # by daemon-reload.
 stop-%:
-	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 start-%:
-	$(sudo) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
+# Dependency to block starting if file in Unit_ConditionPathExists is missing
 exists: need=$(filter-out !%,$(Unit_ConditionPathExists))
 exists: have=$(wildcard $(need))
 exists:
-	@echo EXISTS "$(need)"
 	@test "$(need)" = "$(have)"
+
+# Dependency to block starting if !file in Unit_ConditionPathExists exists
 not-exists: dontwant=$(patsubst !%,%,$(filter !%,$(Unit_ConditionPathExists)))
 not-exists: have=$(wildcard $(dontwant))
 not-exists:
-	@echo "Can't start unit $(unit) due to presence of $(dontwant)" >&2
-	@test -s "$have"
+	@test -s $(strip $(have)) || echo "Can't start unit $(unit) due to presence of $(dontwant)" >&2
+	@test -s $(strip $(have))
 
-mk-private-tmp rm-private-tmp: ptmpdirLoc=$(patsubst %.pid,%.tmpdir,$(pidfile))
-mk-private-tmp:
-	$(sudo) mktemp -d $(SHYSTEMD_PRIVATE_TMP_ROOT).$(unit).XXXXXX > $(tmpdirLoc)
-	$(sudo) mkdir $(shell head -1 $(patsubst %.pid,%.tmpdir,$(pidfile)))/tmp
-
-rm-private-tmp: ptmpdir=$(shell head -1 $(patsubst %.pid,%.tmpdir,$(pidfile)))
+# Beware - private root is incomplete and untested
+# Alternate pointer implementation idea: use a symlink and dereference with realpath
+privateRootPtr=$(scratchDir)/$(unit).privateRoot
+mk-private-root:
+	$(sudoRoot) mktemp -d $(SHYSTEMD_PRIVATE_TMP_ROOT).$(unit).XXXXXX > $(privateRootPtr)
+	$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))
+mk-private-tmp: privateRoot=$(shell head -1 $(privateRootPtr))
+mk-private-tmp: mk-private-root
+	$(sudoRoot) mkdir -m1777 $(shell head -1 $(privateRootPtr))/tmp
+	$(sudoRoot) chown $(Service_User):$(Service_Group) $(shell head -1 $(privateRootPtr))/tmp
+rm-private-tmp: privateRoot=$(shell head -1 $(privateRootPtr))
 rm-private-tmp:
-	@test -s $(patsubst %.pid,%.tmpdir,$(pidfile)) || echo "Cannot rm-private-tmp for unit $(unit) - missing file" >&2 && exit 1
-	@test X$(find $(SHYSTEMD_PRIVATE_TMP_ROOT),$(ptmpdir)) != X
-	@test -d $(shell head -1 $(patsubst %.pid,%.tmpdir,$(pidfile))) 
-	$(sudo) rm -rf $(tmpdir)
+	@!test -z $(strip $(privateRoot))
+	@test $(privateRoot) != /
+	$(sudoUser) rm -rf $(privateRoot)/tmp
+rm-private-root: privateRoot=$(shell head -1 $(privateRootPtr))
+rm-private-root: rm-private-tmp
+	$(sudoRoot) rmdir $(privateRoot)
+	$(sudoRoot) rm $(privateRootPtr)
+
+

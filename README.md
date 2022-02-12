@@ -14,7 +14,7 @@ At Kings Distributed Systems, we use systemd to manage many processes on our ser
 ## Installing
 Clone the repository, and run the `./install.sh` script as root. If your environment does not have a copy of systemd installed, symlinks will be made for `systemctl` and `journalctl`.  The installer writes in the usual LSB locations (`/bin`, `/etc`, `/usr/lib/` etc) by default, except on Darwin where it installs into `/usr/local`.
 
-The installer will not overwrite an existing systemd configuration. You can specify and alternate root via the SHYSTEMD_PREFIX environment variable.
+The installer will not overwrite an existing systemd configuration. You can specify an alternate root via the SHYSTEMD_PREFIX environment variable.
 
 ### Prerequisties
 - UNIX-like Operating System
@@ -42,8 +42,6 @@ start PATTERN...       | Start (activate) one or more units specified on the com
 restart PATTERN...     | Stop and then start one or more units specified on the command line. If the units are not running yet, they will be started.
 show-config PATTERN... | *extension* - dump configuration information to console
 
-### jhournalctl commands
-
 ### Unit File Variables and Concepts
 - WantedBy and After dependencies are supported and can be resolved in parallel
 - pattern units are supported
@@ -55,10 +53,8 @@ show-config PATTERN... | *extension* - dump configuration information to console
 	- User
 	- Group
 	- Type
-	- ?? WorkingDirectory
-	- KillSignal
-	- ?? RuntimeDirectoryMode
-	- ?? RuntimeDirectory
+	- WorkingDirectory
+	- KillSignal (need newer daemon with --signal for full support)
 	- StandardError
 	- StandardOutput
 	- PIDFile
@@ -69,4 +65,8 @@ show-config PATTERN... | *extension* - dump configuration information to console
 	- PrivateTmp (not really)
 	- StartLimitBurst
 	- StartLimitIntervalSec
+        - ExecStart
+
+### jhournalctl commands
+- None yet
 

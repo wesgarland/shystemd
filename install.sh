@@ -73,6 +73,7 @@ assertLocate()
   done
 }
 
+# Main Program Entry Point
 set -o pipefail
 
 echo "Installing shystemd in ${SHYSTEMD_PREFIX}"
@@ -94,6 +95,7 @@ mkdir -p "${SHYSTEMD_PREFIX}"
 cd "${SHYSTEMD_PREFIX}"
 SHYSTEMD_PREFIX="`pwd`"
 cd "${myDir}"
+. etc/shystemd/default-env.incl
 
 locate gmake && make=gmake || make=make
 locate gtar && tar=gtar || tar=tar
@@ -105,6 +107,11 @@ assertLocate printf
 
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
+
+# Build a local config describing this install
+cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF
+[ "\${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX="${SHYSTEMD_PREFIX}"
+EOF 
 
 if [ "${SHYSTEMD_PREFIX}" = "/" ]; then
   # LSB-style install

@@ -1,25 +1,30 @@
-# @file		default-env.incl
-# 		Default environment variables for shystemd. Also Loads local-env.incl
-#               from the same directory if present, which is built by the installer.
-# @author	Wes Garland, wes@kignsds.entwork
-# @date		Feb 2022
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file       default-env.incl
+#
+#             Default environment variables for shystemd. Also Loads local-env.incl
+#             from the same directory if present, which is built by the installer.
+#
+#             *** Must always be sourced from SHYSTEMD_PREFIX ***
+#
+# @author     Wes Garland, wes@kignsds.entwork
+# @date       Feb 2022
 
-tmp=`pwd`
-cd .. || exit 111
+export SHYSTEMD_PREFIX="`pwd`"
 
-[ "$SYSTEMD_CONF_ROOT" ] || export SYSTEMD_CONF_ROOT="`pwd`/etc/systemd"
-export SHYSTEMD_ETC_DIR="`pwd`/etc/shystemd"
-export SHYSTEMD_BIN_DIR="`pwd`/bin"
-export JHOURNALD_LOG_DIR="`pwd`/shystemd-journals"
+# Provide reasonable defaults
+[ "$SYSTEMD_CONF_ROOT" ] || export SYSTEMD_CONF_ROOT="${SHYSTEMD_PREFIX}/etc/systemd"
+export SHYSTEMD_ETC_DIR="${SHYSTEMD_PREFIX}/etc/shystemd"
+export SHYSTEMD_BIN_DIR="${SHYSTEMD_PREFIX}/bin"
+export JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/shystemd-journals"
 
 # Load real local-env.incl if present
 if [ -f "${SHYSTEMD_ETC_DIR}/local-env.incl" ]; then
   . "${SHYSTEMD_ETC_DIR}/local-env.incl" ]
 else
-  # Fakes local-env.incl so that we can run from source dir
-  export SHYSTEMD_LIB_DIR="`pwd`/usr/lib/shystemd"
-  export SHYSTEMD_LIBEXEC_DIR="`pwd`/usr/libexec/shystemd"
-  export SYSTEMD_CONF_ROOT="`pwd`/systemd"
+  # Fake local-env.incl so that we can run from source dir to test
+  export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/usr/lib/shystemd"
+  export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/usr/libexec/shystemd"
+  export SYSTEMD_CONF_ROOT="${SHYSTEMD_PREFIX}/systemd"
 fi
 
-cd "$tmp" || exit 111
+export SHYSTEMD_SCRATCH_DIR="${SYSTEMD_CONF_ROOT}/shystemd-db/system"

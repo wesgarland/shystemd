@@ -66,7 +66,7 @@ show-config PATTERN... | *extension* - dump configuration information to console
 	- PrivateTmp (not really)
 	- StartLimitBurst
 	- StartLimitIntervalSec
-        - ExecStart
+	- ExecStart
 
 ### jhournalctl commands
 - None yet

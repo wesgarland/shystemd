@@ -50,6 +50,7 @@ show-config PATTERN... | *extension* - dump configuration information to console
 	- ConditionPathExists (including `!`)
 	- After
 	- Description
+- [System] variables:
 	- User
 	- Group
 	- Type

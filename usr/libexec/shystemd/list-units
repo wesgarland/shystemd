@@ -12,6 +12,7 @@ set -- $args
 | sed 's/\.service$//' \
 | while read unit
   do
-   $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk status
+    $make unit="$unit" -f "${SHYSTEMD_LIB_DIR}"/service.mk status
+    [ "$?" = "0" ] || exit 2
   done \
 | column -t -s"$TAB"

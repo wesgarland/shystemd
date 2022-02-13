@@ -24,16 +24,6 @@ include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 # used with these from parse-unit
 unescape = $(shell printf -- '$(1)' | sed 's;-;/;g')
 
-ifdef SHYSTEMD_DRY_RUN
-  daemonCmd=@echo \> daemon
-  rm=@echo \> rm 
-  touch=@echo \> touch
-else
-  daemonCmd=daemon
-  rm=rm
-  touch=touch
-endif
-
 # Basic parameters for running daemon
 daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -N
 ifdef Service_PIDFile
@@ -43,7 +33,7 @@ else
 endif
 
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
-  daemon += -F $(pidfile)
+  daemonCmd += -F $(pidfile)
 endif
 
 # Permissions for running daemon. If we are not already running as the unit's
@@ -54,17 +44,35 @@ ifdef Service_User
   ifneq ($(Service_User),$(shell whoami)) 
     sudoUser=sudo -E --user=$(Service_User)
     sudoRoot=sudo -E
-    daemon += -u$(Service_User):$(Service_Group)
+    daemonCmd += -u$(Service_User):$(Service_Group)
   endif
 endif
 ifdef ServiceGroup
   ifndef $(findstring $(ServiceGroup),$(shell groups))
     ifndef sudo
       sudoRoot=sudo -E
-      daemon += -u$(Service_User):$(Service_Group)
+      daemonCmd += -u$(Service_User):$(Service_Group)
     endif
     sudoUser += --group=$(Service_Group)
   endif
+endif
+
+ifdef SHYSTEMD_NO_SUDO
+  ifdef sudoRoot
+$(warning Failed to $(MAKECMDGOALS) $(unit_fullname): Interactive authentication required.)
+$(error See system logs and '$(shystemctl_name) status $(unit_fullname)' for details.)
+  endif
+endif
+
+# Neuter commands with side effects during --dry-run
+ifdef SHYSTEMD_DRY_RUN
+  daemon:=@echo \> $(daemon)
+  rm=@echo \> rm 
+  touch=@echo \> touch
+else
+  daemonCmd=daemon
+  rm=rm
+  touch=touch
 endif
 
 # Basic Parameters to start / monitor services

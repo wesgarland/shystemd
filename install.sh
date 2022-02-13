@@ -14,6 +14,18 @@ else
   [ "${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX=/
 fi
 
+cd "`dirname $argvZero`/."
+myDir="`pwd`"
+mkdir -p "${SHYSTEMD_PREFIX}"
+cd "${SHYSTEMD_PREFIX}"
+SHYSTEMD_PREFIX="`pwd`"
+cd "${myDir}"
+. usr/lib/shystemd/locate
+. etc/shystemd/default-env.incl
+
+# Make a symbolic link, safely, without overwriting something
+# other than a symlink. This is to avoid accidentally clobbering
+# a real systemd installation.
 link()
 {
   local src="$1"
@@ -29,6 +41,7 @@ link()
   ln -vs "$src" "$target"
 }
 
+# Copy a directory tree
 xcopy()
 {
   local src="$1"
@@ -39,38 +52,6 @@ xcopy()
   | egrep -v '~$' \
   | $tar -cf - -T - \
   | (cd "$target" && $tar -xvf -)
-}
-
-locate()
-{
-  OLDIFS="$IFS"
-  for filename in $*
-  do
-    IFS=":"
-    for path in $PATH
-    do
-      if [ -f "${path}/${filename}" ]; then
-        echo "${path}/${filename}"
-        IFS="$OLDIFS"
-        return 0
-      fi
-    done
-  done
-
-  IFS="$OLDIFS"
-  return 1
-}
-
-assertLocate()
-{
-  while [ "$1" ]
-  do
-    if ! locate "$1" >/dev/null; then
-      echo "$1: not found - please install package before installing shystemd" >&2
-      exit 1
-    fi
-    shift
-  done
 }
 
 # Main Program Entry Point
@@ -89,14 +70,7 @@ if [ ! "${TRUST_ME}" ] && [ -f "${SHYSTEMD_PREFIX}/bin/systemctl" ] && [ ! -h "$
   exit 1
 fi
 
-cd "`dirname $argvZero`/."
-myDir="`pwd`"
-mkdir -p "${SHYSTEMD_PREFIX}"
-cd "${SHYSTEMD_PREFIX}"
-SHYSTEMD_PREFIX="`pwd`"
-cd "${myDir}"
-. etc/shystemd/default-env.incl
-
+# Ensure we have the necessary prequisites
 locate gmake && make=gmake || make=make
 locate gtar && tar=gtar || tar=tar
 
@@ -105,6 +79,7 @@ assertLocate $make
 assertLocate $tar
 assertLocate printf
 
+# Begin the actual install
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
 

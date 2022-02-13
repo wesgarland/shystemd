@@ -10,22 +10,101 @@
 # @author       Wes Garland, wes@kingsds.network
 # @date         Feb 2022
 #
-        
-export SHYSTEMD_BIN_DIR=`dirname "${BASH_SOURCE[0]}"`
 
+cd `dirname "$0"`
+export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
 . etc/shystemd/default-env.incl
-cd "${SHYSTEMD_BIN_DIR}" # cwd is always bin
-. "${SHYSTEMD_LIB_DIR}"/locate
-. "${SHYSTEMD_LIB_DIR}"/find-make
+argv="$@"
 
+# Need to process arguments before most libraries load
+processArg()
+{
+  local option="$1"
+  local optarg="$2"
+
+  case "$option" in
+    h|help)
+      ${SHYSTEMD_PAGER:-less -FEd}<<EOF
+shystemctl [OPTIONS...] {COMMAND} ...
+
+Emulate the querying of or sending control commands to the systemd manager.
+  -h --help           Show this help
+     --version        Show package version
+     --failed         Same as --state=failed
+     --debug          Print what is being done
+     --dry-run        Only print what would be done
+     --no-pager       Do not pipe output into a pager
+     --no-ask-password
+                      Do not ask for system passwords
+     --now            Start or stop unit in addition to enabling or disabling it
+     --state=STATE    List units with particular LOAD or SUB or ACTIVE state
+EOF
+      exit 0
+      ;;
+    v|version)
+      echo "systemd 000"
+      echo "shystemd=1.0.0"
+      ;;
+    dry-run)
+      export SHYSTEMD_DRY_RUN=1
+      export SHYSTEMD_DEBUG=1
+      ;;
+    debug)
+      export SHYSTEMD_DEBUG=1
+      ;;
+    state)
+      ;;
+    no-reload)
+      ;;
+    failed)
+      ;;
+    now)
+      ;;
+    no-pager)
+      export SHYSTEMD_PAGER='cat'
+      ;;
+    no-ask-password)
+      export SHYSTEMD_NO_SUDO=1
+      ;;
+    q|quiet)
+      ;;
+    l|full|a|all|no-wall|no-pager|no-block|no-legend|f|force)
+      echo "Warning: shystemd ignoring option ${OPTION}"
+      ;;
+    *)
+      echo "Unrecognized option: ${OPTION}" >&2
+      exit 114
+      ;;
+  esac  
+}
+
+while getopts "hvla-:" OPTION;
+do
+  if [ "$OPTION" = "-" ]; then
+    if [[ "$OPTARG" =~ (^[a-z0-9-]+)=(.*) ]]; then
+      OPTION="${BASH_REMATCH[1]}"
+      OPTARG="${BASH_REMATCH[2]}"
+    else
+      OPTION="${OPTARG}"
+      OPTARG=""
+    fi 
+  fi
+  processArg "$OPTION" "$OPTARG"
+done
+
+shift $[ $OPTIND - 1 ]
 cmd="$1"; shift
 args="$@"
 [ ! "$cmd" ] && cmd="list-units"
+
+. "${SHYSTEMD_LIB_DIR}"/locate
+. "${SHYSTEMD_LIB_DIR}"/find-make
 
 if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
   echo "Unknown operation $cmd" >&2
   exit 1
 fi
 
-(. "${SHYSTEMD_LIBEXEC_DIR}/$cmd")
+export shystemctl_name=`basename ${BASH_SOURCE[0]}`
+(. "${SHYSTEMD_LIBEXEC_DIR}/$cmd") | ${SHYSTEMD_PAGER:-less -FEd}

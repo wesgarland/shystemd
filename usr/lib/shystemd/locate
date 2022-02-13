@@ -25,3 +25,15 @@ locate()
   IFS="$OLDIFS"
   return 1
 }
+
+assertLocate()
+{
+  while [ "$1" ]
+  do
+    if ! locate "$1" >/dev/null; then
+      echo "$1: not found - please install package before installing shystemd" >&2
+      exit 1
+    fi
+    shift
+  done
+}

@@ -11,6 +11,7 @@
 # @date		Feb 2022
 #
 
+# Load config for this unit
 systemDir ?= $(SHYSTEMD_SCRATCH_DIR)
 scratchDir ?= $(SHYSTEMD_SCRATCH_DIR)
 ifdef unit
@@ -32,8 +33,9 @@ else
   pidfile = $(scratchDir)/$(unit).pid
 endif
 
+daemonCmd=daemon
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
-  daemonCmd += -F $(pidfile)
+  daemon += -F $(pidfile)
 endif
 
 # Permissions for running daemon. If we are not already running as the unit's
@@ -44,14 +46,14 @@ ifdef Service_User
   ifneq ($(Service_User),$(shell whoami)) 
     sudoUser=sudo -E --user=$(Service_User)
     sudoRoot=sudo -E
-    daemonCmd += -u$(Service_User):$(Service_Group)
+    daemon += -u$(Service_User):$(Service_Group)
   endif
 endif
 ifdef ServiceGroup
   ifndef $(findstring $(ServiceGroup),$(shell groups))
     ifndef sudo
       sudoRoot=sudo -E
-      daemonCmd += -u$(Service_User):$(Service_Group)
+      daemon += -u$(Service_User):$(Service_Group)
     endif
     sudoUser += --group=$(Service_Group)
   endif
@@ -69,10 +71,11 @@ ifdef SHYSTEMD_DRY_RUN
   daemon:=@echo \> $(daemon)
   rm=@echo \> rm 
   touch=@echo \> touch
+  mkfifo=@echo \> mkfifo
 else
-  daemonCmd=daemon
   rm=rm
   touch=touch
+  mkfifo=mkfifo
 endif
 
 # Basic Parameters to start / monitor services
@@ -95,12 +98,19 @@ endif
 ifeq ($(Service_StandardOutput),syslog)
   launch += --stdout=local7.debug -l local7.info
 else ifeq ($(Service_StandardOutput),journal)
-  launch += --stdout=$(JHOURNALD_LOG_DIR)/$(unit_prefix).log -l $(JHOURNALD_LOG_DIR)/$(unit_prefix).log
+  launch += --stdout=$(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext) -l $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
+  start-deps += $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext) start-journal
+  stop-deps += stop-journal
 endif
 ifeq ($(Service_StandardError),syslog)
   launch += --stdout=local7.notice -b local7.error
 else ifeq ($(Service_StandardError),journal)
-  launch += --stderr=$(JHOURNALD_LOG_DIR)/$(unit_prefix).log -b $(JHOURNALD_LOG_DIR)/$(unit_prefix).log
+  launch += --stderr=$(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext) -b $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
+endif
+ifdef DISABLE_JHOURNALD
+  journal_ext=log
+else
+  journal_ext=pipe
 endif
 
 # Try to emulate PrivateTmp with extra deps and TMPDIR - not very complete (yet?)
@@ -167,7 +177,7 @@ endif #Unit_ConditionPathExists
 # Start a unit
 start: $(start-deps)
 	@echo Starting unit $(unit)
-	$(launch) $(Service_ExecStart)
+	$(launch) -- $(Service_ExecStart)
 ifeq ($(Service_RemainAfterExit),yes)
 	$(touch) $(scratchDir)/$(unit).ran
 endif
@@ -175,11 +185,12 @@ endif
 # Stop a unit
 # Note: Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
 stop: $(stop-deps)
+	@echo Stopping unit $(unit)
 ifeq ($(Service_Type),forking)
 	$(sudoUser) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
 else
 	$(daemon) --signal=$(Service_KillSignal) 2>/dev/null || true
-	$(daemon) --stop
+	$(daemon) --stop || true
 	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
 endif
 
@@ -195,6 +206,28 @@ stop-%:
 	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 start-%:
 	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+
+# Set up resources that daemon will need to talk to jhournald or log files
+$(JHOURNALD_LOG_DIR):
+	mkdir -m1777 "$@"
+$(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
+	$(sudoUser) $(touch) $@
+ifndef DISABLE_JHOURNALD
+$(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe: $(JHOURNALD_LOG_DIR)
+	test -p $@ || $(sudoUser) $(mkfifo) $@
+#XXXXXx fix logs
+start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
+	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid -r \
+	  --stdout=/tmp/stdout --stderr=/tmp/stderr \
+	  -- ${SHYSTEMD_BIN_DIR}/jhournald --pidfile=$(pidfile) --name=$(strip $(notdir $(first-word Service_ExecStart))) $(unit)
+stop-journal:
+	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid --stop || true
+else
+start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
+	@true
+stop-journal:
+	@true
+endif # DISABLE_JHOURNALD
 
 ifndef SHYSTEMD_DRY_RUN
 # Beware - private root is incomplete and untested

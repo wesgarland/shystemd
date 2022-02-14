@@ -1,0 +1,97 @@
+#! /bin/bash
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+#
+# @file         journald
+#
+#               Shell script that copies output pipes from daemons launched with
+#		            shystemctl where the logs are sent to the journal. The script
+#            		reads a line from the pipe, and adds a timestamp for each line.
+#
+
+cd `dirname "$0"`
+export SHYSTEMD_BIN_DIR=`pwd`
+cd "${SHYSTEMD_BIN_DIR}"/..
+. etc/shystemd/default-env.incl
+argv="$@"
+
+#Feb 13 23:18:20 wes-linux-kds gnome-software[9572]
+dateFormat="%b %e %T"
+name=""
+pidfile=""
+
+# Need to process arguments before most libraries load
+processArg()
+{
+  local option="$1"
+  local optarg="$2"
+
+  case "$option" in
+    h|help)
+      ${SHYSTEMD_PAGER:-less -FEd}<<EOF
+Usage: jhournald <unit> [--pidfile=<filename>] 
+                        [--name=<process name>] 
+                        [--dateFormat=<date format string>"
+EOF
+      exit 0
+      ;;
+    pidfile)
+      pidfile="$OPTARG"
+      ;;
+    name)
+      name="$OPTARG"
+      ;;
+    dateFormat)
+      dateFormat="$OPTARG"
+      ;;
+    v|version)
+      echo "journald 000"
+      echo "shystemd=1.0.0"
+      ;;
+    debug)
+      export SHYSTEMD_DEBUG=1
+      ;;
+    no-ask-password)
+      export SHYSTEMD_NO_SUDO=1
+      ;;
+    u|unit)
+      unit=
+      ;;
+    *)
+      echo "Unrecognized option: ${OPTION}" >&2
+      exit 114
+      ;;
+  esac  
+}
+
+while getopts "uhv-:" OPTION;
+do
+  if [ "$OPTION" = "-" ]; then
+    if [[ "$OPTARG" =~ (^[a-z0-9-]+)=(.*) ]]; then
+      OPTION="${BASH_REMATCH[1]}"
+      OPTARG="${BASH_REMATCH[2]}"
+    else
+      OPTION="${OPTARG}"
+      OPTARG=""
+    fi 
+  fi
+  processArg "$OPTION" "$OPTARG"
+done
+shift $[ $OPTIND - 1 ]
+unit="$1"
+
+mkdir -m1777 -p "${JHOURNALD_LOG_DIR}" 2>/dev/null
+[ -d "${JHOURNALD_LOG_DIR}" ] || sudo mkdir -m1777 -p "${JHOURNALD_LOG_DIR}" 
+
+pipe="${JHOURNALD_LOG_DIR}/${unit}.pipe"
+echo "[$$] Monitoring $pipe"
+[ -d "${pipe}" ] || rm -f "${pipe}"
+mkfifo "${pipe}"
+cat "${pipe}" |\
+  while IFS="" read line
+  do
+    if [ "$pidfile" ]; then
+      read daemonPid < "$pidfile"
+      pid="`pgrep -P $daemonPid .`"
+    fi
+    echo `date +"${dateFormat}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
+  done

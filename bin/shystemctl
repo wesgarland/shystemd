@@ -25,8 +25,8 @@ processArg()
 
   case "$option" in
     h|help)
-      ${SHYSTEMD_PAGER:-less -FEd}<<EOF
-shystemctl [OPTIONS...] {COMMAND} ...
+      pager <<EOF
+systemctl [OPTIONS...] {COMMAND} ...
 
 Emulate the querying of or sending control commands to the systemd manager.
   -h --help           Show this help
@@ -53,6 +53,9 @@ EOF
     debug)
       export SHYSTEMD_DEBUG=1
       ;;
+    j|parallelism)
+      export SHYSTEMD_PARALLELISM="$OPTARG"
+      ;;
     state)
       ;;
     no-reload)
@@ -62,7 +65,7 @@ EOF
     now)
       ;;
     no-pager)
-      export SHYSTEMD_PAGER='cat'
+      export SYSTEMD_PAGER='cat'
       ;;
     no-ask-password)
       export SHYSTEMD_NO_SUDO=1
@@ -100,6 +103,7 @@ args="$@"
 
 . "${SHYSTEMD_LIB_DIR}"/locate
 . "${SHYSTEMD_LIB_DIR}"/find-make
+. "${SHYSTEMD_LIB_DIR}"/pager
 
 if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
   echo "Unknown operation $cmd" >&2
@@ -107,4 +111,4 @@ if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
 fi
 
 export shystemctl_name=`basename ${BASH_SOURCE[0]}`
-(. "${SHYSTEMD_LIBEXEC_DIR}/$cmd") | ${SHYSTEMD_PAGER:-less -FEd}
+( . "${SHYSTEMD_LIBEXEC_DIR}/$cmd") | pager

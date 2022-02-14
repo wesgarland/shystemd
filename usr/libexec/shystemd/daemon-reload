@@ -1,4 +1,4 @@
-# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 # @file		daemon-reload
 # 		    scans the system directory and rebuilds the dependencies
 #

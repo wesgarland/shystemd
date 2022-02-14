@@ -122,7 +122,7 @@ ifdef Service_PrivateTmp
 endif
 
 status:
-	@printf "%s\t%s\n" "$(unit)" "$(Unit_Description)"
+	@printf "%s\tloaded\t%s\t%s\t%s\n" "$(unit)" activeOrFailed runningExitedOrFailed "$(Unit_Description)"
 
 .PHONY: deps
 deps:

@@ -1,0 +1,25 @@
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file         pager
+#
+#               Utility functions related to screen display
+#
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#
+
+export SYSTEMD_LESS="${SYSTEMD_LESS:-FRSXMK}"
+export SYSTEMD_PAGER="${SYSTEMD_PAGER:-less}"
+
+pager()
+{
+  LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" -${SYSTEMD_LESS}
+}
+
+rcat()
+{
+  if locate rcat; then
+    rcat $@
+  else
+    tail -r $@
+  fi
+}

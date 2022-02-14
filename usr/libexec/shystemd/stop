@@ -10,7 +10,8 @@
 
 stop()
 {
-  [ -f "${SYSTEMD_CONF_ROOT}/shystemd-db/system/$1.pid" ] && $make unit="$1" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+  $make unit="$1" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 }
 
 forEachUnit stop
+

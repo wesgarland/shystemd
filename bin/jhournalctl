@@ -1,10 +1,161 @@
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 #! /usr/bin/bash
 #
 # @file		jhournalctl
+#
 # 		journalctl replacement for use with shystemctl
+#
 # @author	Wes Garland, wes@kingsds.network
 # @date		Feb 2022
 #
 
-echo NYI
-exit 1
+cd `dirname "$0"`
+export SHYSTEMD_BIN_DIR=`pwd`
+cd "${SHYSTEMD_BIN_DIR}"/..
+. etc/shystemd/default-env.incl
+
+units=()
+
+# Need to process arguments before most libraries load
+processArg()
+{
+  local option="$1"
+  local optarg="$2"
+
+  case "$option" in
+    h|help)
+      ${SHYSTEMD_PAGER:-less -FEd}<<EOF
+jhournalctl [OPTIONS...]
+
+Query the shystemd journal.
+
+Options:
+  -S --since=DATE            Show entries not older than the specified date
+  -U --until=DATE            Show entries not newer than the specified date
+  -k --dmesg                 Show kernel message log from the current boot
+  -u --unit=UNIT             Show logs from the specified unit
+  -g --grep=PATTERN          Show entries with MESSSAGE matching PATTERN
+     --case-sensitive[=BOOL] Force case sensitive or insenstive matching
+  -e --pager-end             Immediately jump to the end in the pager
+  -f --follow                Follow the journal
+  -n --lines[=INTEGER]       Number of journal entries to show
+     --no-tail               Show all lines, even in follow mode
+  -r --reverse               Show the newest entries first
+  -a --all                   Show all fields, including long and unprintable
+     --no-pager              Do not pipe output into a pager
+     --no-hostname           Suppress output of hostname field
+
+Commands:
+  -h --help                  Show this help text
+     --version               Show package version
+EOF
+      exit 0
+      ;;
+    v|version)
+      echo "systemd 000"
+      echo "shystemd=1.0.0"
+      ;;
+    u)
+      units+=("$OPTARG")
+      ;;
+    e|pager-end)
+      JHOURNALD_PAGER_CMD+=+G
+      ;;
+    f|follow)
+      JHOURNALD_PAGER_CMD+=+F
+      follow=1
+      ;;
+    n|lines)
+      lines="$OPTARG"
+      ;;
+    debug)
+      export SHYSTEMD_DEBUG=1
+      ;;
+    no-pager)
+      export SYSTEMD_PAGER='cat'
+      ;;
+    q|quiet)
+      ;;
+    since)
+      since="$OPTARG"
+      ;;
+    "until")
+      until="$OPTARG"
+      ;;
+    k|dmesg)
+      ;;
+    g|grep)
+      ;;
+    system)
+      ;;
+    disk-usage)
+      ;;
+    a|all)
+      export LESSCHARSET=iso8859
+      ;;
+    o|output|x|catalog|m|merge|list-boots|b|user)
+      echo "Warning: jhournalctl ignoring option ${OPTION}"
+      ;;
+    \?)
+      exit 114
+      ;;
+    *)
+      echo "Unrecognized option: ${OPTION}" >&2
+      exit 114
+      ;;
+  esac  
+}
+
+while getopts "an:hvefqu:-:" OPTION;
+do
+  if [ "$OPTION" = "-" ]; then
+    if [[ "$OPTARG" =~ (^[a-z0-9-]+)=(.*) ]]; then
+      OPTION="${BASH_REMATCH[1]}"
+      OPTARG="${BASH_REMATCH[2]}"
+    else
+      OPTION="${OPTARG}"
+      OPTARG=""
+    fi 
+  fi
+  processArg "$OPTION" "$OPTARG"
+done
+shift $[ $OPTIND - 1 ]
+
+# Figure out which log files
+. "${SHYSTEMD_LIB_DIR}"/for-each-unit
+echoIfExists()
+{
+  log="${JHOURNALD_LOG_DIR}/${1}.log"
+  [ -f "$log" ] && echo "$log"
+}
+logs=($(forEachUnit echoIfExists))
+rangeLogs=()
+
+# Extract the date range described in the command line options from the log files
+if [ "${until}" ] || [ "${since}" ] || [ "${lines}" ]; then
+  TMP="`mktemp -d`"
+  cd "$TMP" || exit 99
+  trap "rm -rf \"$TMP\"" EXIT
+
+  rfOpts=()
+  [ "${since}" ] && rfOpts+="-l `date -d \"${since}\" +\"${JHOURNALD_DATE_FMT}\"`"
+  [ "${until}" ] && rfOpts+="-u `date -d \"${until}\" +\"${JHOURNALD_DATE_FMT}\"`"
+
+  for log in ${logs[@]}
+  do
+    bn="`basename \"$log\"`"
+    rangeLogs+="${TMP}/${bn} "
+    if [ "$rfOpts" ]; then
+      echo "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "${JHOURNALD_DATE_FMT}" "${rfOpts[@]}" \> "${TMP}/${bn}"
+      "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "${JHOURNALD_DATE_FMT}" "${rfOpts[@]}" > "${TMP}/${bn}"
+    else
+      tail -n "$lines" "${log}" > "${TMP}/${bn}"
+    fi
+  done
+
+  if [ "$lines" ]; then
+    sort -M --merge -T ${rangeLogs[@]} | tail -n "$lines"
+  else
+    sort -M --merge -T ${rangeLogs[@]}
+  fi
+fi #| ${SHYSTEMD_PAGER:-less -FEd}

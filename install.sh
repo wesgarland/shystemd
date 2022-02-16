@@ -88,6 +88,9 @@ cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF
 [ "\${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX="${SHYSTEMD_PREFIX}"
 EOF 
 
+$make -C range-find
+mv range-find/range-find bin
+
 if [ "${SHYSTEMD_PREFIX}" = "/" ]; then
   # LSB-style install
   xcopy usr "${SHYSTEMD_PREFIX}"
@@ -111,3 +114,4 @@ fi
 
 link "${SHYSTEMD_PREFIX}"/bin/shystemctl "${SHYSTEMD_PREFIX}"/bin/systemctl
 link "${SHYSTEMD_PREFIX}"/bin/jhournalctl "${SHYSTEMD_PREFIX}"/bin/journalctl
+

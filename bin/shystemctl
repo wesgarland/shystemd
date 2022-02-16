@@ -98,7 +98,7 @@ done
 
 shift $[ $OPTIND - 1 ]
 cmd="$1"; shift
-args="$@"
+units=("$@")
 [ ! "$cmd" ] && cmd="list-units"
 
 . "${SHYSTEMD_LIB_DIR}"/locate

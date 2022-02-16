@@ -15,7 +15,6 @@ cd "${SHYSTEMD_BIN_DIR}"/..
 argv="$@"
 
 #Feb 13 23:18:20 wes-linux-kds gnome-software[9572]
-dateFormat="%b %e %T"
 name=""
 pidfile=""
 
@@ -30,7 +29,6 @@ processArg()
       ${SHYSTEMD_PAGER:-less -FEd}<<EOF
 Usage: jhournald <unit> [--pidfile=<filename>] 
                         [--name=<process name>] 
-                        [--dateFormat=<date format string>"
 EOF
       exit 0
       ;;
@@ -39,9 +37,6 @@ EOF
       ;;
     name)
       name="$OPTARG"
-      ;;
-    dateFormat)
-      dateFormat="$OPTARG"
       ;;
     v|version)
       echo "journald 000"
@@ -93,5 +88,5 @@ cat "${pipe}" |\
       read daemonPid < "$pidfile"
       pid="`pgrep -P $daemonPid .`"
     fi
-    echo `date +"${dateFormat}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
+    echo `date +"${JHOURNALD_DATE_FMT}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
   done

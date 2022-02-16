@@ -193,6 +193,10 @@ else
 	$(daemon) --stop || true
 	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
 endif
+#ifneq (X,$(filter start-journal,$(start-deps)))
+	rm -f $(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe
+	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid --stop || true
+#endif
 
 # Restart a unit
 restart:
@@ -215,13 +219,10 @@ $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
 ifndef DISABLE_JHOURNALD
 $(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe: $(JHOURNALD_LOG_DIR)
 	test -p $@ || $(sudoUser) $(mkfifo) $@
-#XXXXXx fix logs
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
 	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid -r \
 	  --stdout=/tmp/stdout --stderr=/tmp/stderr \
 	  -- ${SHYSTEMD_BIN_DIR}/jhournald --pidfile=$(pidfile) --name=$(strip $(notdir $(first-word Service_ExecStart))) $(unit)
-stop-journal:
-	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid --stop || true
 else
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
 	@true

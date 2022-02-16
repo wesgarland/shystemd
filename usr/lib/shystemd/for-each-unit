@@ -1,3 +1,4 @@
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 # @file		for-each-unit
 # 		Enumerate and interate over units
 #
@@ -6,22 +7,20 @@
 #
 
 # Run a function for each of the unit-name glob expressions that were passed
-# in $args (shystemctl argv)
+# in $units - a global array
 #
 # $1: function to run; default=echo
 forEachUnit()
 {
-  local cmd="${1:-echo}"
-  set -- $args
-  while [ "$1" ]
+  local cmd="$1"
+  
+  for unitGlob in "${units[@]}"
   do    
-    unitGlob="$1"
-    shift
     (cd "${SYSTEMD_CONF_ROOT}/system" && ls $unitGlob.service)\
     | sed 's/\.service$//' \
     | while read unit
       do
-	$cmd "$unit"
+        $cmd "$unit"
       done
   done
 }

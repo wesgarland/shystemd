@@ -28,3 +28,4 @@ else
 fi
 
 export SHYSTEMD_SCRATCH_DIR="${SYSTEMD_CONF_ROOT}/shystemd-db/system"
+export JHOURNALD_DATE_FMT="%b %e %T"

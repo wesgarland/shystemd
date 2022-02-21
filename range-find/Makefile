@@ -15,3 +15,4 @@ top: $(PROGS)
 
 clean: 
 	rm -f $(PROGS) $(OBJS)
+	rm -rf $(foreach base,$(OBJS:.o=),$(base).dSYM)

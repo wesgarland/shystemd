@@ -1,0 +1,152 @@
+#! /bin/bash -e
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+#
+# @file         parse-date
+#               Date parsing code mostly equivalent to systemd.time(7). Does not
+#               depend on GNU Date, should work on any Unix<tm> with bash >= 3.
+#
+#               Dates are parsed with respect to the current user's timezone, but
+#               results are emitted in UTC. Jhournald logfiles are indexed in UTC.
+#
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
+#                                                                              
+
+failDateParse()
+{
+  echo "Failed to parse timestamp: $*" >&2
+  exit 1
+}
+
+# Parse a date/time expression.  The expression is passed on the argument vector.
+# The resultant timestamp is emitted, in locale=C TZ=UTC on stdout.
+parseDate()
+{
+  argv="$@"
+
+  # Figure out the current date/time
+  set -- `date +"%Y %m %e %H %M %S %Z" | sed 's/\([: ]\)\(0\)/\1/g'`
+  YYYY=$1
+  MM=$2
+  DD=$3
+  hh=$4
+  mm=$5
+  ss=$6
+  _TZ=$7
+
+  # Parse the arguments
+  set -- `echo "$argv" | sed -e 's/\([0-9]\)\([a-z]\)/\1 \2/g' -e 's/\([a-z]\)\([0-9]\)/\1 \2/g'`
+  sign=+
+  for token in "$@"
+  do
+    [ "$token" = "ago" ] && sign=-
+  done
+  
+  while [ "$1" ]
+  do
+    token="$1"
+    units=""
+    amt=""
+    shift
+
+    # Token is a date
+    if [[ "$token" =~ ^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]) ]]; then
+      YYYY=${BASH_REMATCH[1]}
+      MM=${BASH_REMATCH[2]}
+      DD=${BASH_REMATCH[3]}
+      continue
+    fi
+
+    # Token is a time
+    if [[ "$token" =~ ^([0-9][0-9]?):([0-9][0-9]?)(:([0-9][0-9]?))? ]]; then
+      hh=${BASH_REMATCH[1]}
+      mm=${BASH_REMATCH[2]}
+      ss=${BASH_REMATCH[4]:-0}
+      continue
+    fi
+
+    case "$token" in
+      yesterday)
+        hh=0
+        mm=0
+        ss=0
+        DD=$[ $DD - 1]
+        continue
+        ;;
+      today)
+        hh=0
+        mm=0
+        ss=0
+        continue
+        ;;
+      tomorrow)
+        hh=0
+        mm=0
+        ss=0
+        DD=$[ $DD + 1]
+        continue
+        ;;
+      ago)
+        continue; # already handled before loop
+        ;;
+    esac
+
+    # One token look-ahead, assume current token is amount
+    amt="$token"
+    case "$1" in
+      h|hour|hours)
+        units=hh
+        ;;
+      m|min|minute|minutes)
+        units=mm
+        ;;
+      s|sec|secs|second|seconds)
+        units=ss
+        ;;
+      y|year|years)
+        units=YYYY
+        ;;
+      mon|month|months|M)
+        units=mm
+        ;;
+      d|day|days)
+        units=DD
+        ;;
+      weeks|week|s)
+        units=DD
+        amt=$[ ${amt:-1} * 7 ]
+        ;;
+      msec|ms)
+        units=SS
+        amt=$[(500 + $amt) / 1000]
+        ;;
+      usec|us)
+        units=SS
+        amt=$[(500000 + $amt) / 1000000]
+        ;;
+    esac
+
+    # set units? adjust internal rep'n and consume look ahead
+    if [ "$units" ]; then
+      eval $units=$[ $units $sign $amt ]
+      shift
+      continue
+    fi
+
+    # Token must have been a timezone
+    if [ "$token" = "UTC" ]; then
+      _TZ=GMT
+    else
+      _TZ="$token"
+    fi
+  done
+
+  # Have now parsed deltas - use touch + ls as a poor-man's version of mktime + strptime
+  stampFile=`mktemp`
+  trap "rm \"$stampFile\"" EXIT
+
+  TZ="$_TZ" touch -t `printf "%04i%02i%02i%02i%02i.%02i" $YYYY $MM $DD $hh $mm $ss` $stampFile
+  set -- `LC_ALL=C TZ=GMT ls -lT "$stampFile" | grep -v '^total' | sed -e 's/^\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)#\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\(.*\)/\6 \7 \8 \9/'`
+
+  echo "$6 $7 $8 GMT"
+}

@@ -131,6 +131,8 @@ echoIfExists()
 logs=($(forEachUnit echoIfExists))
 rangeLogs=()
 
+. "${SHYSTEMD_LIB_DIR}"/parse-date
+
 # Extract the date range described in the command line options from the log files
 if [ "${until}" ] || [ "${since}" ] || [ "${lines}" ]; then
   TMP="`mktemp -d`"

@@ -1,13 +1,15 @@
 #! /bin/bash
 # -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 #
-# @file         journald
+# @file         jhournald
 #
 #               Shell script that copies output pipes from daemons launched with
-#		            shystemctl where the logs are sent to the journal. The script
-#            		reads a line from the pipe, and adds a timestamp for each line.
+#               shystemctl where the logs are sent to the journal. The script
+#            	reads a line from the pipe, and adds a timestamp for each line 
+#               as it is read.
 #
-
+#               Timestamps are locale C, timezone UTC.
+#
 cd `dirname "$0"`
 export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
@@ -88,5 +90,5 @@ cat "${pipe}" |\
       read daemonPid < "$pidfile"
       pid="`pgrep -P $daemonPid .`"
     fi
-    echo `date +"${JHOURNALD_DATE_FMT}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
+    echo `TZ=UTC LC_ALL=C date +"${JHOURNALD_DATE_FMT}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
   done

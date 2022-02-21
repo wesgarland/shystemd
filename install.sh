@@ -1,4 +1,5 @@
 #! /bin/bash -e
+# -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 #
 # @file         install.sh
 #               Installer for shystemd. Uses LSB layout when SHYSTEMD_PREFIX=/ (default)
@@ -72,35 +73,35 @@ fi
 
 # Ensure we have the necessary prequisites
 locate gmake && make=gmake || make=make
-locate gtar && tar=gtar || tar=tar
+locate gtar  && tar=gtar   || tar=tar
 
 assertLocate daemon
 assertLocate $make
 assertLocate $tar
 assertLocate printf
 
+$make -C range-find
+mv range-find/range-find bin
+
 # Begin the actual install
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
 
 # Build a local config describing this install
-cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF
+cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF1
 [ "\${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX="${SHYSTEMD_PREFIX}"
-EOF 
-
-$make -C range-find
-mv range-find/range-find bin
+EOF1
 
 if [ "${SHYSTEMD_PREFIX}" = "/" ]; then
   # LSB-style install
   xcopy usr "${SHYSTEMD_PREFIX}"
   echo mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
   mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
-  cat > "${SHYSTEMD_PREFIX}/local-env.incl" <<EOF
+  cat > "${SHYSTEMD_PREFIX}/local-env.incl" <<EOF2
   export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/usr/lib/shystemd"
   export SHYSTEMD_LIBEXEC_DIR="${SHYSTEMD_PREFIX}/usr/libexec/shystemd"
   export JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
-EOF
+EOF2
 else
   # BSD-style install
   cd usr

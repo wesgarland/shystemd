@@ -56,6 +56,9 @@ EOF
     j|parallelism)
       export SHYSTEMD_PARALLELISM="$OPTARG"
       ;;
+    no-parallel)
+      export SHYSTEMD_PARALLELISM=1
+      ;;
     state)
       ;;
     no-reload)

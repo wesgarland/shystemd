@@ -12,7 +12,11 @@ export SYSTEMD_PAGER="${SYSTEMD_PAGER:-less}"
 
 pager()
 {
-  LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" -${SYSTEMD_LESS}
+  if [ "${SYSTEMD_PAGER}" = "cat" ]; then
+    LC_CTYPE="${SYSTEMD_LESSCHARSET:-utf-8}" cat
+  else
+    LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" -${SYSTEMD_LESS}
+  fi
 }
 
 rcat()

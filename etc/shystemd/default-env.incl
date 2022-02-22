@@ -28,4 +28,15 @@ else
 fi
 
 export SHYSTEMD_SCRATCH_DIR="${SYSTEMD_CONF_ROOT}/shystemd-db/system"
-export JHOURNALD_DATE_FMT="%b %e %T"
+
+if grep -q '^shystemd-journal:' /etc/group; then
+  export SHYSTEMD_ADM_GROUP=shystemd-journal
+elif grep -q '^adm:' /etc/group; then
+  export SHYSTEMD_ADM_GROUP=adm
+elif grep -q '^systemd-journal:' /etc/group; then
+  export SHYSTEMD_ADM_GROUP=systemd-journal
+elif grep -q '^wheel:' /etc/group; then
+  export SHYSTEMD_ADM_GROUP=wheel
+else
+  export SHYSTEMD_ADM_GROUP=0
+fi

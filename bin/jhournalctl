@@ -1,5 +1,5 @@
+#! /bin/bash
 # -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
-#! /usr/bin/bash
 #
 # @file		jhournalctl
 #
@@ -121,43 +121,89 @@ do
 done
 shift $[ $OPTIND - 1 ]
 
+red='\e[31m'
+yellow='\e[33m'
+grey='\e[38;5;247m'
+normal='\e[0m'
+function error()
+{
+  printf "%s%s%s\n" "$red" "$1" "$normal"
+}
+
+function merge()
+{
+  if [ "$2" ]; then
+    sort -n -merge "$@"
+  else
+    cat "$1"
+  fi
+}
+
 # Figure out which log files
 . "${SHYSTEMD_LIB_DIR}"/for-each-unit
+echoAlways()
+{
+  echo "${JHOURNALD_LOG_DIR}/${1}.journal"
+}
 echoIfExists()
 {
-  log="${JHOURNALD_LOG_DIR}/${1}.log"
-  [ -f "$log" ] && echo "$log"
+  log="${JHOURNALD_LOG_DIR}/${1}.journal"
+  [ -e "$log" ] && echo "$log"
 }
-logs=($(forEachUnit echoIfExists))
+[ "$units" ] || units='*'
+allLogs=($(forEachUnit echoAlways))
+existLogs=($(forEachUnit echoIfExists))
 rangeLogs=()
+
+if [ "${allLogs[@]}" = "" ]; then
+  echo 'Failed to add filter for units: No data available'
+  exit 1
+fi
 
 . "${SHYSTEMD_LIB_DIR}"/parse-date
 
-# Extract the date range described in the command line options from the log files
-if [ "${until}" ] || [ "${since}" ] || [ "${lines}" ]; then
-  TMP="`mktemp -d`"
-  cd "$TMP" || exit 99
-  trap "rm -rf \"$TMP\"" EXIT
+# Extract the ranges described in the command line options from the log files and merge them
+(
+  [ "$since" -o "$until" ] && [ "$lines" = "" ] && lines=10
+  
+  if [ "${until}" ] || [ "${since}" ] || [ "${lines}" ]; then
+    TMP="`mktemp -d`"
+    cd "$TMP" || exit 99
+    trap "rm -rf \"$TMP\"" EXIT
 
-  rfOpts=()
-  [ "${since}" ] && rfOpts+="-l `date -d \"${since}\" +\"${JHOURNALD_DATE_FMT}\"`"
-  [ "${until}" ] && rfOpts+="-u `date -d \"${until}\" +\"${JHOURNALD_DATE_FMT}\"`"
+    rfOpts=()
+    [ "${since}" ] && rfOpts+="-l `parseDate \"${since}\"`"
+    [ "${until}" ] && rfOpts+="-u `parseDate \"${until}\"`"
 
-  for log in ${logs[@]}
-  do
-    bn="`basename \"$log\"`"
-    rangeLogs+="${TMP}/${bn} "
-    if [ "$rfOpts" ]; then
-      echo "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "${JHOURNALD_DATE_FMT}" "${rfOpts[@]}" \> "${TMP}/${bn}"
-      "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "${JHOURNALD_DATE_FMT}" "${rfOpts[@]}" > "${TMP}/${bn}"
+    for log in ${existLogs[@]}
+    do
+      bn="`basename \"$log\"`"
+      rangeLogs+="${TMP}/${bn} "
+      if [ "$rfOpts" ]; then
+        echo "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "%b %e %T" "${rfOpts[@]}" \> "${TMP}/${bn}"
+        LC_ALL=C "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "%b %e %T" "${rfOpts[@]}" > "${TMP}/${bn}"
+      else
+        tail -n "$lines" "${log}" > "${TMP}/${bn}"
+      fi
+    done
+
+    if [ "$lines" ]; then
+      merge ${rangeLogs[@]} | tail -n "$lines"
     else
-      tail -n "$lines" "${log}" > "${TMP}/${bn}"
+      merge ${rangeLogs[@]}
     fi
-  done
-
-  if [ "$lines" ]; then
-    sort -M --merge -T ${rangeLogs[@]} | tail -n "$lines"
   else
-    sort -M --merge -T ${rangeLogs[@]}
+    # no range => whole file(s)
+    merge ${existLogs[@]}
   fi
-fi #| ${SHYSTEMD_PAGER:-less -FEd}
+
+  [ "$follow" ] && tail -F ${allLogs[@]} 2>/dev/null
+) | (
+# FIRST LINE
+  if [ "$lines" ]; then
+    tail -n "$[lines - 1]" | ${SHYSTEMD_PAGER:-less -FEd}
+  else
+    ${SHYSTEMD_PAGER:-less -FEd}
+  fi
+)
+

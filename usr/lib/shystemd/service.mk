@@ -26,12 +26,9 @@ include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 unescape = $(shell printf -- '$(1)' | sed 's;-;/;g')
 
 # Basic parameters for running daemon
-daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -N
-ifdef Service_PIDFile
-  pidfile = $(Service_PIDFile)
-else
-  pidfile = $(scratchDir)/$(unit).pid
-endif
+daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -NU
+pidfile = $(scratchDir)/$(unit).pid
+client-pidfile = $(pidfile:.pid=.clientpid)
 
 daemonCmd=daemon
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
@@ -100,7 +97,6 @@ ifeq ($(Service_StandardOutput),syslog)
 else ifeq ($(Service_StandardOutput),journal)
   launch += --stdout=$(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext) -l $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
   start-deps += $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext) start-journal
-  stop-deps += stop-journal
 endif
 ifeq ($(Service_StandardError),syslog)
   launch += --stdout=local7.notice -b local7.error
@@ -121,11 +117,20 @@ ifdef Service_PrivateTmp
   launch += -e "TMPDIR=$(shell head -1 $(scratchDir)/$(unit).privateRoot)"
 endif
 
+###############################################################################
+# Display unit status
 status:
 	@printf "%s\tloaded\t%s\t%s\t%s\n" "$(unit)" activeOrFailed runningExitedOrFailed "$(Unit_Description)"
 
+###############################################################################
+# Figure out if a unit is running
+running:
+	$(daemon) --running && echo RUNNING
+
+###############################################################################
+# Generate unit dependencies - used by daemon-reload - similar to makedepend
 .PHONY: deps
-deps:
+deps: $(JHOURNALD_LOG_DIR)/$(unit_prefix).journal
 ifdef SHYSTEMD_DEBUG
 	@echo Building deps - $(unit) is needed by $(Install_WantedBy)
 endif
@@ -135,6 +140,8 @@ endif
 	$(shell $(foreach dep, $(Unit_After), echo stop:  stop-$(dep)  >> $(systemDir)/$(unit_prefix).deps;))
 	@true
 
+###############################################################################
+# Troubleshooting targets
 show-config:
 	@echo pwd=$(shell pwd)	
 	@echo launch="$(launch)"
@@ -153,10 +160,7 @@ debug:
 
 show-unit-config: debug show-config
 
-# Figure out if a service is running
-running:
-	$(daemon) --running && echo RUNNING
-
+###############################################################################
 # Add extra deps to start for ConditionPathExists
 ifdef Unit_ConditionPathExists
 start: exists not-exists
@@ -174,7 +178,12 @@ not-exists:
 	test -s $(strip $(have))
 endif #Unit_ConditionPathExists
 
+###############################################################################
 # Start a unit
+#
+# Launches an instance of daemon to monitor the process, and (by means of $(start-deps)),
+# and instance which monitors jhournald if this service is configured ot used the journal.
+#
 start: $(start-deps)
 	@echo Starting unit $(unit)
 	$(launch) -- $(Service_ExecStart)
@@ -182,57 +191,68 @@ ifeq ($(Service_RemainAfterExit),yes)
 	$(touch) $(scratchDir)/$(unit).ran
 endif
 
+###############################################################################
 # Stop a unit
-# Note: Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
+#
+# - Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
+# - Type=Forking services should have PIDFile set, so that we kill the service daemon, 
+#   rather than the pid that $(daemon) was launched as
 stop: $(stop-deps)
 	@echo Stopping unit $(unit)
 ifeq ($(Service_Type),forking)
-	$(sudoUser) kill -$(Service_KillSignal) $(shell head -1 $(pidfile))
+	$(sudoUser) kill -$(Service_KillSignal) $(Service_PIDFile)
 else
-	$(daemon) --signal=$(Service_KillSignal) 2>/dev/null || true
-	$(daemon) --stop || true
-	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
+# needs daemon >= .08	[ ! -f $(scratchDir)/$(unit).pid ] || $(daemon) --signal=$(Service_KillSignal) || true
+	$(sudoUser) [ ! -f $(client-pidfile) ] || pkill -F $(client-pidfile) -$(Service_KillSignal)
 endif
-#ifneq (X,$(filter start-journal,$(start-deps)))
-	rm -f $(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe
-	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid --stop || true
-#endif
+	[ ! -f $(scratchDir)/$(unit).pid ] || $(daemon) --stop
+	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
+	[ ! -f $(scratchDir)/jhournald-$(unit).pid ] || $(sudoRoot) daemon -n jhournald-$(unit_prefix) -NUF $(scratchDir)/jhournald-$(unit).pid --stop
 
+###############################################################################
 # Restart a unit
 restart:
-	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
-	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
+###############################################################################
 # Pattern rules start and stop dependencies via submake. Dependencies are listed
 # in *.deps files, their target names begin with start- and stop-, and are built
 # by daemon-reload.
 stop-%:
-	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
 start-%:
-	$(sudoRoot) $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
+###############################################################################
 # Set up resources that daemon will need to talk to jhournald or log files
 $(JHOURNALD_LOG_DIR):
 	mkdir -m1777 "$@"
-$(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
+$(JHOURNALD_LOG_DIR)/$(unit_prefix).journal: $(JHOURNALD_LOG_DIR)
 	$(sudoUser) $(touch) $@
+	sudo chgrp ${SHYSTEMD_ADM_GROUP} $@ || true
+	sudo chmod 640 $@ || true
+
 ifndef DISABLE_JHOURNALD
 $(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe: $(JHOURNALD_LOG_DIR)
 	test -p $@ || $(sudoUser) $(mkfifo) $@
+ifeq ($(Service_Restart),always)
+start-journal: respawn=respawn
+endif
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
-	$(sudoRoot) daemon -n journal-$(unit_prefix) -NF ${scratchDir}/jhournald-$(unit).pid -r \
-	  --stdout=/tmp/stdout --stderr=/tmp/stderr \
-	  -- ${SHYSTEMD_BIN_DIR}/jhournald --pidfile=$(pidfile) --name=$(strip $(notdir $(first-word Service_ExecStart))) $(unit)
+	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(scratchDir)/jhournald-$(unit).pid $(respawn) \
+	  --stdout=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stdout \
+	  --stderr=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stderr \
+	  -- ${SHYSTEMD_BIN_DIR}/jhournald --pidfile=$(pidfile) $(addprefix --name=,$(notdir $(first-word Service_ExecStart))) $(unit)
 else
-start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
-	@true
-stop-journal:
+start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).journal: $(JHOURNALD_LOG_DIR)
 	@true
 endif # DISABLE_JHOURNALD
 
-ifndef SHYSTEMD_DRY_RUN
-# Beware - private root is incomplete and untested
+###############################################################################
+# Beware - private root support is incomplete and untested
 # Alternate pointer implementation idea: use a symlink and dereference with realpath
+ifndef SHYSTEMD_DRY_RUN
 privateRootPtr=$(scratchDir)/$(unit).privateRoot
 mk-private-root:
 	$(sudoRoot) mktemp -d $(SHYSTEMD_PRIVATE_TMP_ROOT).$(unit).XXXXXX > $(privateRootPtr)

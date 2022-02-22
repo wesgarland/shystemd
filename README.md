@@ -108,3 +108,6 @@ Shystemd uses GNU Make variables, which inherit from the environment, to represe
 | SHYSTEMD_PARALLELISM        | Limit # of units to start/start in parallel, default=10
 | SHYSTEMD_DEBUG              | Enable debug mode, eg show make rules as they are run
 | SHYSTEMD_DRY_RUN            | Try (!!) not to do anything with side effects, print those commands instead
+
+## Known Issues
+

@@ -20,6 +20,11 @@ argv="$@"
 name=""
 pidfile=""
 
+sed='sed -u' # gnu sed
+if [ "`uname -s`" = "Darwin" ] && echo | sed -l >/dev/null 2>&1; then
+  sed='sed -l' # native mac sed (bsd?)
+fi
+
 # Need to process arguments before most libraries load
 processArg()
 {
@@ -83,12 +88,12 @@ pipe="${JHOURNALD_LOG_DIR}/${unit}.pipe"
 echo "[$$] Monitoring $pipe"
 [ -d "${pipe}" ] || rm -f "${pipe}"
 mkfifo "${pipe}"
-cat "${pipe}" |\
+$sed -e 's/%/%%/g' < "${pipe}" |\
   while IFS="" read line
   do
     if [ "$pidfile" ]; then
       read daemonPid < "$pidfile"
       pid="`pgrep -P $daemonPid .`"
     fi
-    echo `TZ=UTC LC_ALL=C date +"${JHOURNALD_DATE_FMT}"` "$HOSTNAME [$pid] $line" | tee -a "${JHOURNALD_LOG_DIR}/${unit}.log"
+    TZ=UTC LC_ALL=C date +"%s %a %b %e %Y %T $HOSTNAME $name[$pid] $line" >> "${JHOURNALD_LOG_DIR}/${unit}.journal"
   done

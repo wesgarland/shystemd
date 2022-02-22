@@ -7,11 +7,12 @@
 #
 
 . "${SHYSTEMD_LIB_DIR}"/parse-unit
+. "${SHYSTEMD_LIB_DIR}"/for-each-unit
 
-rm -rf "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
+rm -f "${SYSTEMD_CONF_ROOT}"/shystemd-db/system/*.mk
 mkdir -m1777 -p "${SYSTEMD_CONF_ROOT}"/shystemd-db/system
 
-# Parse the systemd unit file into a makefile
+# Parse each systemd unit file into a makefile
 (cd "${SYSTEMD_CONF_ROOT}" && ls system/*.service)\
 | while read file
   do

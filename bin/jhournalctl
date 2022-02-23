@@ -156,7 +156,7 @@ allLogs=($(forEachUnit echoAlways))
 existLogs=($(forEachUnit echoIfExists))
 rangeLogs=()
 
-if [ "${allLogs[@]}" = "" ]; then
+if [ ${#allLogs[@]} = 0 ]; then
   echo 'Failed to add filter for units: No data available'
   exit 1
 fi
@@ -165,24 +165,24 @@ fi
 
 # Extract the ranges described in the command line options from the log files and merge them
 (
-  [ "$since" -o "$until" ] && [ "$lines" = "" ] && lines=10
-  
   if [ "${until}" ] || [ "${since}" ] || [ "${lines}" ]; then
     TMP="`mktemp -d`"
     cd "$TMP" || exit 99
     trap "rm -rf \"$TMP\"" EXIT
 
     rfOpts=()
-    [ "${since}" ] && rfOpts+="-l `parseDate \"${since}\"`"
-    [ "${until}" ] && rfOpts+="-u `parseDate \"${until}\"`"
+
+    [ "${since}" ] && rfOpts+=" -l `parseDate \"${since}\"`"
+    [ "${until}" ] && rfOpts+=" -u `parseDate \"${until}\"`"
+    [ "${since}" ] && [ ! "${until}" ] && rfOpts+=" -nu $[ 2 ** 62 ]"
 
     for log in ${existLogs[@]}
     do
       bn="`basename \"$log\"`"
       rangeLogs+="${TMP}/${bn} "
+
       if [ "$rfOpts" ]; then
-        echo "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "%b %e %T" "${rfOpts[@]}" \> "${TMP}/${bn}"
-        LC_ALL=C "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -p "%b %e %T" "${rfOpts[@]}" > "${TMP}/${bn}"
+        DEBUG_RANGE_FIND=1 LC_ALL=C "${SHYSTEMD_BIN_DIR}"/range-find -f "${log}" -S -p '%b-%e-%T-%Z' ${rfOpts[@]} -n > "${TMP}/${bn}"
       else
         tail -n "$lines" "${log}" > "${TMP}/${bn}"
       fi
@@ -198,13 +198,17 @@ fi
     merge ${existLogs[@]}
   fi
 
-  [ "$follow" ] && tail -F ${allLogs[@]} 2>/dev/null
+  # Bug - could miss log entries between phases here
+
+  [ "$follow" ] && tail -n0 -F ${allLogs[@]} 2>/dev/null
 ) | (
 # FIRST LINE
   if [ "$lines" ]; then
-    tail -n "$[lines - 1]" | ${SHYSTEMD_PAGER:-less -FEd}
+    tail -n "$lines" | ${SHYSTEMD_PAGER:-less -FEd}
   else
     ${SHYSTEMD_PAGER:-less -FEd}
   fi
 )
 
+  [ "$since" -o "$until" ] && [ "$lines" = "" ] && lines=10
+  

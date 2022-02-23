@@ -148,5 +148,5 @@ parseDate()
   TZ="$_TZ" touch -t `printf "%04i%02i%02i%02i%02i.%02i" $YYYY $MM $DD $hh $mm $ss` $stampFile
   set -- `LC_ALL=C TZ=GMT ls -lT "$stampFile" | grep -v '^total' | sed -e 's/^\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)#\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\([^ ]*  *\)\(.*\)/\6 \7 \8 \9/'`
 
-  echo "$6 $7 $8 GMT"
+  echo "$6-$7-$8-GMT"
 }

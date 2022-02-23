@@ -62,7 +62,8 @@ EOF
       JHOURNALD_PAGER_CMD+=+G
       ;;
     f|follow)
-      JHOURNALD_PAGER_CMD+=+F
+#      JHOURNALD_PAGER_CMD+=+F
+      export SHYSTEMD_PAGER='cat'
       follow=1
       ;;
     n|lines)
@@ -72,7 +73,7 @@ EOF
       export SHYSTEMD_DEBUG=1
       ;;
     no-pager)
-      export SYSTEMD_PAGER='cat'
+      export SHYSTEMD_PAGER='cat'
       ;;
     q|quiet)
       ;;

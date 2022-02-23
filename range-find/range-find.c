@@ -23,6 +23,7 @@ typedef long long atoll_t(const char *nptr);
 
 static atoll_t *atoll_fn;
 static char buf[MAX_LINE_SIZE];
+static int seconds = 0;
 
 void searchBackwardsToLineStart(FILE *file)
 {
@@ -120,6 +121,7 @@ static char *timeFormat = "%b %e %T";
 long long logdateParse(const char *buf)
 {
   struct tm *tm_p;
+  time_t et;
 
   if (!timeBuf)
     time(&timeBuf);
@@ -131,7 +133,9 @@ long long logdateParse(const char *buf)
     exit(4);
   }
 
-  return 1000 * mktime(tm_p);
+  et = mktime(tm_p);
+
+  return seconds ? et : 1000 * et;
 }
 
 #ifdef SUPPORT_GETDATE
@@ -193,10 +197,11 @@ void usage(const char *argvZero)
       " -l specifies the lower bounds of the range\n"
       " -u specifies the upper bounds of the range\n"
       " -f specifies the name of the file to search\n"
+      " -S toggles internal time representation between ms and s (default=%s)\n"
       "\n"
       "Note: Files with lines longer than %li bytes may result in failed searches.\n",
-      argvZero, sizeof(buf)
-         );
+      argvZero, (seconds ? "s" : "ms"), sizeof(buf)
+  );
   exit(0);
 }
 
@@ -215,10 +220,13 @@ int main(int argc, char * const *argv)
 #ifdef SUPPORT_GETDATE
                       "g"
 #endif
-                      "hsp:f:l:u:n")) != EOF)
+                      "Shsp:f:l:u:n")) != EOF)
   {
     switch(ch)
     {
+      case 'S':
+        seconds = seconds ? 0 : 1;
+        break;      
       case 'h':
         usage(argv[0]);
         break;
@@ -254,6 +262,15 @@ int main(int argc, char * const *argv)
   if (!file) {
     fprintf(stderr, "Error opening '%s' (%s)\n", filename, strerror(errno));
     return 1;
+  }
+
+  if (getenv("DEBUG_RANGE_FIND"))
+    fprintf(stderr, "Range: %lld - %lld\n", rangeStart, rangeEnd);
+
+  if (rangeEnd < rangeStart)
+  {
+    fprintf(stderr, "Error: range must end after start\n");
+    return 2;
   }
 
   rangeStartPos = findClosestLineStart(file, rangeStart);

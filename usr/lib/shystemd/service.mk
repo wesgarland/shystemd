@@ -28,7 +28,7 @@ unescape = $(shell printf -- '$(1)' | sed 's;-;/;g')
 # Basic parameters for running daemon
 daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -NU
 pidfile = $(scratchDir)/$(unit).pid
-client-pidfile = $(pidfile:.pid=.clientpid)
+journal-pidfile = $(scratchDir)/journal-$(unit).pid
 
 daemonCmd=daemon
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
@@ -66,7 +66,7 @@ endif
 # Neuter commands with side effects during --dry-run
 ifdef SHYSTEMD_DRY_RUN
   daemon:=@echo \> $(daemon)
-  rm=@echo \> rm 
+  rm=@echo \> rm
   touch=@echo \> touch
   mkfifo=@echo \> mkfifo
 else
@@ -76,9 +76,13 @@ else
 endif
 
 # Basic Parameters to start / monitor services
-launch = $(daemon) -D$(Service_WorkingDirectory)
+launch = $(daemon) -D$(Service_WorkingDirectory) --ignore-eof
 launch += $(foreach assignment, $(Service_Environment),-e "$(assignment)")
 ifeq ($(Service_Restart),always)
+  launch += --respawn
+endif
+ifeq ($(Service_Restart),on-failure)
+  # no support for on-failure, treat like always
   launch += --respawn
 endif
 ifeq ($(Service_Type),oneshot)
@@ -191,29 +195,46 @@ ifeq ($(Service_RemainAfterExit),yes)
 	$(touch) $(scratchDir)/$(unit).ran
 endif
 
+stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 ###############################################################################
 # Stop a unit
 #
-# - Requires newer (0.8?) version of daemon to ensure correct kill signal is sent
 # - Type=Forking services should have PIDFile set, so that we kill the service daemon, 
 #   rather than the pid that $(daemon) was launched as
+stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 stop: $(stop-deps)
 	@echo Stopping unit $(unit)
-ifeq ($(Service_Type),forking)
-	$(sudoUser) kill -$(Service_KillSignal) $(Service_PIDFile)
+	$(rm) -f $(scratchDir)/$(unit).ran
+ifeq ($(Service_Type),forking) 
+        # service-managed pid file, daemon has already exited
+	[ -f $(Service_PIDFILE) ] && $(sudoUser) kill -$(Service_KillSignal) $(Service_PIDFile) || true
+	[ -f $(Service_PIDFile) ] && $(sudoUser) pkill -0 -F $(Service_PIDFile) && sleep 1 && $(sudoUser) pkill -TERM -F $(Service_PIDFile) || true
+	[ -f $(Service_PIDFile) ] && $(sudoUser) pkill -0 -F $(Service_PIDFile) && sleep 1 && $(sudoUser) pkill -TERM -F $(Service_PIDFile) || true
+	[ -f $(Service_PIDFile) ] && $(sudoUser) pkill -0 -F $(Service_PIDFile) && sleep 1 && $(sudoUser) pkill -9    -F $(Service_PIDFile) || true
+	rm -f $(Service_PIDFile)
 else
-# needs daemon >= .08	[ ! -f $(scratchDir)/$(unit).pid ] || $(daemon) --signal=$(Service_KillSignal) || true
-	$(sudoUser) [ ! -f $(client-pidfile) ] || pkill -F $(client-pidfile) -$(Service_KillSignal)
-endif
-	[ ! -f $(scratchDir)/$(unit).pid ] || $(daemon) --stop
-	$(rm) -f $(scratchDir)/$(unit).ran $(scratchDir)/$(unit).pid
-	[ ! -f $(scratchDir)/jhournald-$(unit).pid ] || $(sudoRoot) daemon -n jhournald-$(unit_prefix) -NUF $(scratchDir)/jhournald-$(unit).pid --stop
+	[ -f $(pidfile) ] && $(sudoUser) pkill -$(Service_KillSignal) -P $(daemon-pid) . || true
+	[ -f $(pidfile) ] && $(daemon) --stop && sleep 0.1 || true
+	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -9    -P $(daemon-pid) . || true
+	[ -f $(pidfile) ] && $(sudoUser) pkill -9 -F $(pidfile) || true
+endif 
+        # Tell jhournald to stop, then make it stop.
+	[ -f $(journal-pidfile) ] && $(sudoRoot) daemon -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --stop && sleep 0.1 || true
+	[ -f $(journal-pidfile) ] && sleep 1 && $(sudoUser) pkill -TERM -F $(journal-pidfile) 2>/dev/null	|| true
+	[ -f $(journal-pidfile) ] && sleep 1 && $(sudoUser) pkill -TERM -F $(journal-pidfile) 2>/dev/null	|| true
+	[ -f $(journal-pidfile) ] && sleep 1 && $(sudoUser) pkill -TERM -F $(journal-pidfile) 2>/dev/null	|| true
+	[ -f $(journal-pidfile) ] && sleep 1 && $(sudoUser) pkill -9    -F $(journal-pidfile)			|| true
+        # remove the journald pidfile only if the process is not running
+	[ ! -f $(journal-pidfile) ] || ! $(sudoUser) pkill -0 -F $(journal-pidfile)
+	rm -f $(journal-pidfile)
 
 ###############################################################################
 # Restart a unit
 restart:
-	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
-	$(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+	$(daemon) --restart
 
 ###############################################################################
 # Pattern rules start and stop dependencies via submake. Dependencies are listed
@@ -237,13 +258,19 @@ ifndef DISABLE_JHOURNALD
 $(JHOURNALD_LOG_DIR)/$(unit_prefix).pipe: $(JHOURNALD_LOG_DIR)
 	test -p $@ || $(sudoUser) $(mkfifo) $@
 ifeq ($(Service_Restart),always)
-start-journal: respawn=respawn
+start-journal: daemon-opts+=--respawn
 endif
+
+###############################################################################
+# Start the journal if it is not running - jhournald reads the output pipe, adds
+# a synthetic timestamp and pid, and writes to the .journal file.
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
-	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(scratchDir)/jhournald-$(unit).pid $(respawn) \
+	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --running ||\
+	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) $(daemon-opts) \
+	  --ignore-eof \
 	  --stdout=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stdout \
 	  --stderr=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stderr \
-	  -- ${SHYSTEMD_BIN_DIR}/jhournald --pidfile=$(pidfile) $(addprefix --name=,$(notdir $(first-word Service_ExecStart))) $(unit)
+	  -- ${SHYSTEMD_BIN_DIR}/jhournald --daemon-pidfile=$(pidfile) $(addprefix --name=,$(notdir $(first-word Service_ExecStart))) $(unit)
 else
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).journal: $(JHOURNALD_LOG_DIR)
 	@true

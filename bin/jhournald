@@ -10,6 +10,15 @@
 #
 #               Timestamps are locale C, timezone UTC.
 #
+#               Note - this is pretty inefficient.  A call to check the pidfile and
+#               a call to date per log line will definitely be a performance bottleneck,
+#               which could affect the log timestamps as well as stall the program at
+#               the other end of the pipe.
+# 
+# @author	Wes Garland, wes@kingsds.network
+# @date		Feb 2022
+#
+
 cd `dirname "$0"`
 export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
@@ -34,12 +43,12 @@ processArg()
   case "$option" in
     h|help)
       ${SHYSTEMD_PAGER:-less -FEd}<<EOF
-Usage: jhournald <unit> [--pidfile=<filename>] 
+Usage: jhournald <unit> [--daemon-pidfile=<filename>] 
                         [--name=<process name>] 
 EOF
       exit 0
       ;;
-    pidfile)
+    daemon-pidfile)
       pidfile="$OPTARG"
       ;;
     name)
@@ -95,5 +104,5 @@ $sed -e 's/%/%%/g' < "${pipe}" |\
       read daemonPid < "$pidfile"
       pid="`pgrep -P $daemonPid .`"
     fi
-    TZ=UTC LC_ALL=C date +"%s %a %b %e %Y %T $HOSTNAME $name[$pid] $line" >> "${JHOURNALD_LOG_DIR}/${unit}.journal"
+    TZ=UTC LC_ALL=C date +"%s $HOSTNAME $name[$pid] $line" >> "${JHOURNALD_LOG_DIR}/${unit}.journal"
   done

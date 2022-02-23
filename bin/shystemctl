@@ -113,5 +113,12 @@ if [ ! -f "${SHYSTEMD_LIBEXEC_DIR}/$cmd" ]; then
   exit 1
 fi
 
+# Disable pager for specific commands
+case "$cmd" in
+  start|stop|restart)
+    export SYSTEMD_PAGER='cat'
+    ;;
+esac
+
 export shystemctl_name=`basename ${BASH_SOURCE[0]}`
 ( . "${SHYSTEMD_LIBEXEC_DIR}/$cmd") | pager

@@ -23,7 +23,7 @@ sudo systemctl start myservice
 ```
 
 ## Installing
-Clone the repository, and run the `./install.sh` script as root. If your environment does not have a copy of systemd installed, symlinks will be made for `systemctl` and `journalctl`.  The installer writes in the usual LSB locations (`/bin`, `/etc`, `/usr/lib/` etc) by default, except on Darwin where it installs into `/usr/local`.
+Clone the repository, and run the `./install.sh` script as root. If your environment does not have a copy of systemd installed, symlinks will be made for `systemctl` and `journalctl`.  The installer writes in the usual LSB locations (`/bin`, `/etc`, `/usr/lib/` etc) by default, except on macOS where it installs into `/usr/local`.
 
 The installer will not overwrite an existing systemd configuration. You can specify an alternate root via the SHYSTEMD_PREFIX environment variable.
 
@@ -34,12 +34,24 @@ The installer will not overwrite an existing systemd configuration. You can spec
 - daemon 0.6 or better
 	- Ubuntu: `sudo apt-get install daemon`
 	- Mac Homebrew: `sudo brew install daemon` 
+- typical OS utilities, usually part of default install on macOS, Ubuntu, etc
+	- pkill (procps package)
+	- grep
+	- sed
+	- touch
+	- date
+	- etc
+
+#### Extras for Jhournalctl
+- working C compiler
 
 ## Status
 This product is lightly tested and should not be used for production work, or on any machine which contains critical information. There are semantic differences between `shystemctl` and `systemctl`, however they relatively minimal.
 
 ### Supported
 - System Services  (/etc/systemd/system/*.service)
+- Most systemctl commands
+- Most journalctl commands and options
 
 ### Not Supported
 - SVR4-style init.d (coming?)
@@ -108,6 +120,6 @@ Shystemd uses GNU Make variables, which inherit from the environment, to represe
 | SHYSTEMD_PARALLELISM        | Limit # of units to start/start in parallel, default=10
 | SHYSTEMD_DEBUG              | Enable debug mode, eg show make rules as they are run
 | SHYSTEMD_DRY_RUN            | Try (!!) not to do anything with side effects, print those commands instead
-
-## Known Issues
-
+| SHYSTEMD_NO_SUDO            | Don't try to sudo when shystemd needs more permissions
+| DISABLE_JHOURNALD	      | Don't use jhournald, write stdout/stderr directly to logs w/o timestamps etc
+| JHOURNALD_LOG_DIR	      | Directory where logs and/or journals are stored

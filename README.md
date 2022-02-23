@@ -1,6 +1,6 @@
 # Shystemd
  
-Welcome to Shystemd, a lightweight partial replacement for `systemctl` and `journalctl` written largely in GNU Bash and GNU Make, heavily leveraging the `daemon` program by *raf <raf@raf.org>*.
+Welcome to Shystemd, a lightweight partial replacement for `systemctl` and `journalctl` written largely in GNU Bash and GNU Make, heavily leveraging the `daemon` program by raf *<raf@raf.org>*.
 
 Copyright (c) 2022 Kings Distributed Systems.
 Released under the terms of the MIT License.
@@ -15,6 +15,7 @@ sudo systemctl daemon-reload
 sudo systemctl start myservice
 ```
 **Note:** the installer will not make symlinks to overwrite "real" systemd resources. To run shystemd alongside systemd, you will have to use `shystemctl` and `jhournalctl`.
+
 **Warning:** *this is early alpha software and loaded with bugs. It needs root access to your system. It can break things. You have been warned. If you don't understand this warning, please ask your system administrator for help.*
 
 ## Rationale

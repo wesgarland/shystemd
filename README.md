@@ -1,18 +1,11 @@
 # Shystemd
  
-Welcome to Shystemd, a lightweight partial replacement for `systemctl` and `journalctl` written largely in GNU Bash and GNU Make.
+Welcome to Shystemd, a lightweight partial replacement for `systemctl` and `journalctl` written largely in GNU Bash and GNU Make, heavily leveraging the `daemon` program by *raf <raf@raf.org>*.
 
 Copyright (c) 2022 Kings Distributed Systems.
-Licensed under the terms of the MIT License.
+Released under the terms of the MIT License.
 
-## Rationale
-At Kings Distributed Systems, we use systemd to manage many processes on our servers, and our systemd unit files are machine-generated from another set of config files. We wanted to be able to test our platform in a variety production-like environments, and full testing would include start/stop operation via `systemctl`. Our test environments include:
- - Docker containers, especially in GitLab CI
- - directories on the local filesystem where we set an alternate root via environment variables
- - chroot jails on developer machines
-
-## Getting Started, the tldr version
-Inside your environment which does not already have a systemd,
+## Getting Started, the tldr; version
 ```bash
 git clone https://github.com/wesgarland/shystemd
 cd shystemd
@@ -21,9 +14,17 @@ sudo ./install.sh
 sudo systemctl daemon-reload
 sudo systemctl start myservice
 ```
+**Note:** the installer will not make symlinks to overwrite "real" systemd resources. To run shystemd alongside systemd, you will have to use `shystemctl` and `jhournalctl`.
+**Warning:** *this is early alpha software and loaded with bugs. It needs root access to your system. It can break things. You have been warned. If you don't understand this warning, please ask your system administrator for help.*
+
+## Rationale
+At Kings Distributed Systems, we use systemd to manage many processes on our servers, and our systemd unit files are machine-generated from another set of config files. We wanted to be able to test our platform in a variety production-like environments, and full testing would include start/stop operation via `systemctl`. Our test environments include:
+ - Docker containers, especially in GitLab CI
+ - directories on the local filesystem where we set an alternate root via environment variables
+ - chroot jails on developer machines
 
 ## Installing
-Clone the repository, and run the `./install.sh` script as root. If your environment does not have a copy of systemd installed, symlinks will be made for `systemctl` and `journalctl`.  The installer writes in the usual LSB locations (`/bin`, `/etc`, `/usr/lib/` etc) by default, except on macOS where it installs into `/usr/local`.
+Clone the repository, and `sudo shystemd/install.sh`. If your environment does not have a copy of systemd installed, symlinks will be made for `systemctl` and `journalctl`.  The installer writes in the usual LSB locations (`/bin`, `/etc`, `/usr/lib/` etc) by default, except on macOS where it installs into `/usr/local`.
 
 The installer will not overwrite an existing systemd configuration. You can specify an alternate root via the SHYSTEMD_PREFIX environment variable.
 
@@ -34,6 +35,7 @@ The installer will not overwrite an existing systemd configuration. You can spec
 - daemon 0.6 or better
 	- Ubuntu: `sudo apt-get install daemon`
 	- Mac Homebrew: `sudo brew install daemon` 
+	- Source Code: https://github.com/raforg/daemon
 - typical OS utilities, usually part of default install on macOS, Ubuntu, etc
 	- pkill (procps package)
 	- grep
@@ -49,7 +51,7 @@ The installer will not overwrite an existing systemd configuration. You can spec
 This product is lightly tested and should not be used for production work, or on any machine which contains critical information. There are semantic differences between `shystemctl` and `systemctl`, however they relatively minimal.
 
 ### Supported
-- System Services  (/etc/systemd/system/*.service)
+- System services  (/etc/systemd/system/*.service)
 - Most systemctl commands
 - Most journalctl commands and options
 
@@ -59,7 +61,7 @@ This product is lightly tested and should not be used for production work, or on
 - socket
 - dbus messaging
 
-### Semantic Differences
+### Major Semantic Differences
 - Unit patterns in `systemctl` are resolved against units loaded memory; `shystemctl` patterns are resolved against unit files on the disk.
 - `systemctl` uses a graphical authentication frontend to ask for passwords; `shystemctl` uses `sudo`
 - `PrivateTmp` support in `shystemd` doesn't really work as expected; it just makes and cleans up an extra `$TMPDIR`.

@@ -8,12 +8,14 @@
 #ifdef SUPPORT_GETDATE
 # define _GNU_SOURCE
 #endif
+#define _XOPEN_SOURCE 500
+#include <time.h>
+#include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <time.h>
 
 #ifndef MAX_LINE_SIZE
 # define MAX_LINE_SIZE 65536

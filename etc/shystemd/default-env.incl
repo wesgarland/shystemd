@@ -4,12 +4,15 @@
 #             Default environment variables for shystemd. Also Loads local-env.incl
 #             from the same directory if present, which is built by the installer.
 #
-#             *** Must always be sourced from SHYSTEMD_PREFIX ***
+#             *** Must always be sourced from SHYSTEMD_PREFIX or have SHYSTEMD_PREFIX specified ***
 #
 # @author     Wes Garland, wes@kignsds.entwork
 # @date       Feb 2022
 
-export SHYSTEMD_PREFIX="`pwd`"
+if [ ! "${SHYSTEMD_PREFIX}" ]; then
+  SHYSTEMD_PREFIX="`pwd`"
+fi
+export SHYSTEMD_PREFIX
 
 # Provide reasonable defaults
 [ "$SYSTEMD_CONF_ROOT" ] || export SYSTEMD_CONF_ROOT="${SHYSTEMD_PREFIX}/etc/systemd"
@@ -19,7 +22,10 @@ export JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/shystemd-journals"
 
 # Load real local-env.incl if present
 if [ -f "${SHYSTEMD_ETC_DIR}/local-env.incl" ]; then
-  . "${SHYSTEMD_ETC_DIR}/local-env.incl" ]
+  OLD_PWD="`pwd`"
+  cd "${SHYSTEMD_PREFIX}"
+  . "${SHYSTEMD_ETC_DIR}/local-env.incl"
+  cd "${OLD_PWD}"                                          
 else
   # Fake local-env.incl so that we can run from source dir to test
   export SHYSTEMD_LIB_DIR="${SHYSTEMD_PREFIX}/usr/lib/shystemd"

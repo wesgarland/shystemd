@@ -1,16 +1,16 @@
 #! /bin/bash
 # -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
 #
-# @file		jhournalctl
+# @file         jhournalctl
 #
-# 		journalctl replacement for use with shystemctl
+#               journalctl replacement for use with shystemctl
 #
-# @author	Wes Garland, wes@kingsds.network
-# @date		Feb 2022
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
 #
 
 cd `dirname "$0"`
-export SHYSTEMD_BIN_DIR=`pwd`
+[ "${SHYSTEMD_BIN_DIR}" ] || export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
 . etc/shystemd/default-env.incl
 
@@ -134,7 +134,7 @@ function error()
 function merge()
 {
   if [ "$2" ]; then
-    sort -n -merge "$@"
+    sort -n --merge -- "$@"
   else
     cat "$1"
   fi

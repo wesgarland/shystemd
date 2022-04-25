@@ -34,6 +34,13 @@ daemonCmd=daemon
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
   daemon += -F $(pidfile)
 endif
+DAEMON_VER:=$(shell daemon --version | sed -e 's/daemon-//' -e 's/\./ /g')
+DAEMON_MAJ_VER:=$(word 1,$(DAEMON_VER))
+DAEMON_MIN_VER:=$(word 2,$(DAEMON_VER))
+DAEMON_REV_VER:=$(word 3,$(DAEMON_VER))
+ifneq (06,$(DAEMON_MAJ_VER)$(DAEMON_MIN_VER))
+  daemonCmd += --ignore-eof
+endif
 
 # Permissions for running daemon. If we are not already running as the unit's
 # correct user, the variables sudoRoot and sudoUser are defined, otherwise blank.
@@ -76,7 +83,7 @@ else
 endif
 
 # Basic Parameters to start / monitor services
-launch = $(daemon) -D$(Service_WorkingDirectory) --ignore-eof
+launch = $(daemon) -D$(Service_WorkingDirectory)
 launch += $(foreach assignment, $(Service_Environment),-e "$(assignment)")
 ifeq ($(Service_Restart),always)
   launch += --respawn
@@ -265,9 +272,8 @@ endif
 # Start the journal if it is not running - jhournald reads the output pipe, adds
 # a synthetic timestamp and pid, and writes to the .journal file.
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
-	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --running ||\
-	$(sudoUser) daemon -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) $(daemon-opts) \
-	  --ignore-eof \
+	$(sudoUser) $(daemonCmd) -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --running ||\
+	$(sudoUser) $(daemonCmd) -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) $(daemon-opts) \
 	  --stdout=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stdout \
 	  --stderr=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stderr \
 	  -- ${SHYSTEMD_BIN_DIR}/jhournald --daemon-pidfile=$(pidfile) $(addprefix --name=,$(notdir $(first-word Service_ExecStart))) $(unit)

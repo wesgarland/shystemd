@@ -52,6 +52,9 @@ ifdef Service_User
     sudoRoot=sudo -E
     daemon += -u$(Service_User):$(Service_Group)
   endif
+  ifeq ($(Service_User),root)
+    daemon += --idiot
+  endif	
 endif
 ifdef ServiceGroup
   ifndef $(findstring $(ServiceGroup),$(shell groups))
@@ -100,6 +103,8 @@ ifdef Service_StartLimitBurst
 endif
 ifdef Service_StartLimitIntervalSec
   launch += --delay=$(Service_StartLimitIntervalSec)
+else
+  launch += --delay=10
 endif
 
 # Logging
@@ -278,8 +283,12 @@ start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
 	  --stderr=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stderr \
 	  -- ${SHYSTEMD_BIN_DIR}/jhournald --daemon-pidfile=$(pidfile) $(addprefix --name=,$(notdir $(first-word Service_ExecStart))) $(unit)
 else
-start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).journal: $(JHOURNALD_LOG_DIR)
+###############################################################################
+# Make sure we can make a log since the journals are turned off
+start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log $(JHOURNALD_LOG_DIR)
 	@true
+$(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
+	@date >> $@
 endif # DISABLE_JHOURNALD
 
 ###############################################################################

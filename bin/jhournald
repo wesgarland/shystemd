@@ -5,7 +5,7 @@
 #
 #               Shell script that copies output pipes from daemons launched with
 #               shystemctl where the logs are sent to the journal. The script
-#            	reads a line from the pipe, and adds a timestamp for each line 
+#               reads a line from the pipe, and adds a timestamp for each line 
 #               as it is read.
 #
 #               Timestamps are locale C, timezone UTC.
@@ -15,21 +15,21 @@
 #               which could affect the log timestamps as well as stall the program at
 #               the other end of the pipe.
 # 
-# @author	Wes Garland, wes@kingsds.network
-# @date		Feb 2022
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
 #
+ESC_SEQ=`echo -en "\x03\x01\x07\x03 jhournald"`
 
 cd `dirname "$0"`
-export SHYSTEMD_BIN_DIR=`pwd`
+[ "${SHYSTEMD_BIN_DIR}" ] || export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
 . etc/shystemd/default-env.incl
 argv="$@"
 
-#Feb 13 23:18:20 wes-linux-kds gnome-software[9572]
 name=""
 pidfile=""
 
-sed='sed -u' # gnu sed
+sed='tail -F | sed -u'
 if [ "`uname -s`" = "Darwin" ] && echo | sed -l >/dev/null 2>&1; then
   sed='sed -l' # native mac sed (bsd?)
 fi
@@ -93,16 +93,54 @@ unit="$1"
 mkdir -m1777 -p "${JHOURNALD_LOG_DIR}" 2>/dev/null
 [ -d "${JHOURNALD_LOG_DIR}" ] || sudo mkdir -m1777 -p "${JHOURNALD_LOG_DIR}" 
 
+
+# Pipe protocol:
+# - send esc + owner info down pipe
+# - if we read owner info that's not self, bail
+# - first send happens in background, because not reading the pipe
+#   can stall it
+
 pipe="${JHOURNALD_LOG_DIR}/${unit}.pipe"
 echo "[$$] Monitoring $pipe"
-[ -d "${pipe}" ] || rm -f "${pipe}"
-mkfifo "${pipe}"
-$sed -e 's/%/%%/g' < "${pipe}" |\
-  while IFS="" read line
-  do
-    if [ "$pidfile" ]; then
-      read daemonPid < "$pidfile"
-      pid="`pgrep -P $daemonPid .`"
-    fi
-    TZ=UTC LC_ALL=C date +"%s $HOSTNAME $name[$pid] $line" >> "${JHOURNALD_LOG_DIR}/${unit}.journal"
-  done
+[ -p "${pipe}" ] || mkfifo "${pipe}"
+echo "${ESC_SEQ} owner $$" >> "${pipe}" &
+sleep 1
+
+while true
+do
+  pid=''
+  
+  tail -F "${pipe}" \
+  | sed -u -e 's/%/%%/g' \
+  | while IFS="" read line
+    do
+      if [[ "$line" =~ ^("${ESC_SEQ} ")([^ ]*)( )(.*) ]]; then
+        case "${BASH_REMATCH[2]}" in
+          "owner")
+            if [ "${BASH_REMATCH[4]}" = "$$" ]; then
+              echo "got self owner message" >&2
+              continue
+            fi
+            echo "new jhournald on pid ${BASH_REMATCH[4]}; shutting down pid $$" >&2
+            exit 1
+            ;;
+          "die")
+            echo "jhournald die request; shutting down pid $$" >&2
+            exit 1
+            ;;
+          *)
+            echo "unknown management command ${BASH_REMATCH[2]}" >&2
+            ;;
+        esac
+      fi      
+
+      if [ ! "$pid" ] && [ "$pidfile" ] && [ -f "$pidfile" ]; then
+        read daemonPid < "$pidfile"
+        pid="`pgrep -P $daemonPid .`"
+      fi
+
+      TZ=UTC LC_ALL=C date +"%s $HOSTNAME $name[$pid] $line" >> "${JHOURNALD_LOG_DIR}/${unit}.journal"
+    done
+  [ "$?" = 0 ] || exit 2
+done
+echo "jhournald - shutdown $$"

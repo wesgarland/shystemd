@@ -1,0 +1,21 @@
+# -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# @file       destroy
+#             stop every shystemd process in its tracks. Provided to clean up test environments,
+#             not well-suited for use as a more powerful stop.
+#
+# @author     Wes Garland, wes@kingsds.network
+# @date       Feb 2022
+#
+
+cd "${SYSTEMD_CONF_ROOT}/system"
+
+find "${SYSTEMD_CONF_ROOT}/system" -name \*.pid | while read pidfile
+do
+  pkill -9 -F $pidfile 
+done
+
+ls >/dev/null
+ls *.service 2>/dev/null | sed 's/\.service$//' | while read service
+do
+  $make unit="$service" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+done

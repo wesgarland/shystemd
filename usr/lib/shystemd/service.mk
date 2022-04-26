@@ -68,8 +68,8 @@ endif
 
 ifdef SHYSTEMD_NO_SUDO
   ifdef sudoRoot
-$(warning Failed to $(MAKECMDGOALS) $(unit_fullname): Interactive authentication required.)
-$(error See system logs and '$(shystemctl_name) status $(unit_fullname)' for details.)
+    $(warning Failed to $(MAKECMDGOALS) $(unit_fullname): Interactive authentication required.)
+    $(error See system logs and '$(shystemctl_name) status $(unit_fullname)' for details.)
   endif
 endif
 
@@ -94,17 +94,17 @@ endif
 ifeq ($(Service_Restart),on-failure)
   # no support for on-failure, treat like always
   launch += --respawn
+  ifdef Service_StartLimitIntervalSec
+    launch += --delay=$(Service_StartLimitIntervalSec)
+  else
+    launch += --delay=10
+  endif
 endif
 ifeq ($(Service_Type),oneshot)
   launch += --foreground
 endif
 ifdef Service_StartLimitBurst
   launch += --limit=$(Service_StartLimitBurst)
-endif
-ifdef Service_StartLimitIntervalSec
-  launch += --delay=$(Service_StartLimitIntervalSec)
-else
-  launch += --delay=10
 endif
 
 # Logging

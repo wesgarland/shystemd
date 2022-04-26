@@ -1,9 +1,9 @@
 # -*-  Mode: sh; tab-width: 8; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
-# @file		for-each-unit
-# 		Enumerate and interate over units
+# @file         for-each-unit
+#               Enumerate and interate over units
 #
-# @author	Wes Garland, wes@kingsds.network
-# @date		Feb 2022
+# @author       Wes Garland, wes@kingsds.network
+# @date         Feb 2022
 #
 
 # Run a function for each of the unit-name glob expressions that were passed

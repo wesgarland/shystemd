@@ -90,15 +90,18 @@ launch = $(daemon) -D$(Service_WorkingDirectory)
 launch += $(foreach assignment, $(Service_Environment),-e "$(assignment)")
 ifeq ($(Service_Restart),always)
   launch += --respawn
+  ifdef Service_StartLimitInterval
+    Unit_StartLimitIntervalSec=$(Service_StartLimitInterval)
+  endif
+  ifdef Unit_StartLimitIntervalSec
+    launch += --delay=$(Unit_StartLimitIntervalSec)
+  else
+    launch += --delay=10
+  endif
 endif
 ifeq ($(Service_Restart),on-failure)
   # no support for on-failure, treat like always
   launch += --respawn
-  ifdef Service_StartLimitIntervalSec
-    launch += --delay=$(Service_StartLimitIntervalSec)
-  else
-    launch += --delay=10
-  endif
 endif
 ifeq ($(Service_Type),oneshot)
   launch += --foreground

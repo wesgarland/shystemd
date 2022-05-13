@@ -7,15 +7,18 @@
 # @date         Feb 2022
 #
 
-export SYSTEMD_LESS="${SYSTEMD_LESS:-FRSXMK}"
-export SYSTEMD_PAGER="${SYSTEMD_PAGER:-less}"
+if [ "${SYSTEMD_PAGER_SECURE}" ]; then
+  SYSTEMD_PAGER="${SYSTEMD_PAGER:-${PAGER:-less}}"
+else
+  SYSTEMD_PAGER="less"
+fi
 
 pager()
 {
   if [ "${SYSTEMD_PAGER}" = "cat" ]; then
-    LC_CTYPE="${SYSTEMD_LESSCHARSET:-utf-8}" cat
-  else
-    LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" -${SYSTEMD_LESS}
+    LC_CTYPE="${SYSTEMD_LESSCHARSET:-utf-8}" cat $*
+  else 
+    LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" ${SYSTEMD_LESS:--FRSXMK} $*
   fi
 }
 

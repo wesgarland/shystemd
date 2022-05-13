@@ -63,7 +63,8 @@ EOF
       ;;
     f|follow)
 #      JHOURNALD_PAGER_CMD+=+F
-      export SHYSTEMD_PAGER='cat'
+      export SYSTEMD_PAGER_SECURE='true'
+      export SYSTEMD_PAGER='cat'
       follow=1
       ;;
     n|lines)
@@ -73,7 +74,8 @@ EOF
       export SHYSTEMD_DEBUG=1
       ;;
     no-pager)
-      export SHYSTEMD_PAGER='cat'
+      export SYSTEMD_PAGER_SECURE='true'
+      export SYSTEMD_PAGER='cat'
       ;;
     q|quiet)
       ;;
@@ -204,9 +206,10 @@ fi
 ) | (
 # FIRST LINE
   if [ "$lines" ]; then
-    tail -n "$lines" | ${SHYSTEMD_PAGER:-less -FEd}
+    export SYSTEMD_PAGER_SECURE='true'
+    tail -n "$lines" | ${SYSTEMD_PAGER:-less -FEd}
   else
-    ${SHYSTEMD_PAGER:-less -FEd}
+    ${SYSTEMD_PAGER:-less -FEd}
   fi
 )
 

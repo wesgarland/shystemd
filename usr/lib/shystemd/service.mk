@@ -249,7 +249,8 @@ endif
 ###############################################################################
 # Restart a unit
 restart:
-	$(daemon) --restart
+	[ -f "$(Service_PIDFILE)" ] && $(daemon) --restart || $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk stop
+	[ ! -f "$(Service_PIDFILE)" ] && $(MAKE) unit="$*" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
 
 ###############################################################################
 # Pattern rules start and stop dependencies via submake. Dependencies are listed

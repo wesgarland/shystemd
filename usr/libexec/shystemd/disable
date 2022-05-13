@@ -1,16 +1,16 @@
 # -*-  Mode: sh; tab-width: 2; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
-# @file       start
-#             start a given unit
-#
+# @file       disable
+#             stub
 # @author     Wes Garland, wes@kingsds.network
-# @date       Feb 2022
+# @date       May 2022
 #
 
 . "${SHYSTEMD_LIB_DIR}"/for-each-unit
 
-start()
+disable()
 {
-  $make unit="$1" -f "${SHYSTEMD_LIB_DIR}"/service.mk start
+  # we don't care about reboot behaviour
+  echo "$1" >/dev/null
 }
 
-forEachUnit start
+forEachUnit disable

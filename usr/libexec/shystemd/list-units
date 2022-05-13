@@ -19,7 +19,7 @@ sed 's/\.service$//' < /tmp/shystemd-list-units.$$ \
       [ "$?" = "0" ] || exit 2
     done\
   )\
-| column -t -s"$TAB"
+| (column -t -s"$TAB" 2>/dev/null || cat)
 
 nUnits=`grep -c '^' /tmp/shystemd-list-units.$$`
 

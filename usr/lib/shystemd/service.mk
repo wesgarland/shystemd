@@ -30,7 +30,7 @@ daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -NU
 pidfile = $(scratchDir)/$(unit).pid
 journal-pidfile = $(scratchDir)/journal-$(unit).pid
 
-daemonCmd=daemon
+daemonCmd=daemon -i
 ifneq ($(Service_Type),forking)  # forking => daemon manages own pidfile
   daemon += -F $(pidfile)
 endif

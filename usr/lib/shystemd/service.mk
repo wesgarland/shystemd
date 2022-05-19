@@ -204,7 +204,7 @@ endif #Unit_ConditionPathExists
 # and instance which monitors jhournald if this service is configured ot used the journal.
 #
 start: $(start-deps)
-	@echo Starting unit $(unit)
+	@[ "$SHYSTEMD_VERBOSE" ] && echo Starting unit $(unit)
 	$(launch) -- $(Service_ExecStart)
 ifeq ($(Service_RemainAfterExit),yes)
 	$(touch) $(scratchDir)/$(unit).ran
@@ -218,7 +218,7 @@ stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 #   rather than the pid that $(daemon) was launched as
 stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 stop: $(stop-deps)
-	@echo Stopping unit $(unit)
+	@[ "$SHYSTEMD_VERBOSE" ] && echo Stopping unit $(unit)
 	$(rm) -f $(scratchDir)/$(unit).ran
 ifeq ($(Service_Type),forking) 
         # service-managed pid file, daemon has already exited
@@ -228,12 +228,12 @@ ifeq ($(Service_Type),forking)
 	[ -f $(Service_PIDFile) ] && $(sudoUser) pkill -0 -F $(Service_PIDFile) && sleep 1 && $(sudoUser) pkill -9    -F $(Service_PIDFile) || true
 	rm -f $(Service_PIDFile)
 else
-	[ -f $(pidfile) ] && $(sudoUser) pkill -$(Service_KillSignal) -P $(daemon-pid) . || true
+	[ -f $(pidfile) -a "$(daemon-pid)" ] && $(sudoUser) pkill -$(Service_KillSignal) -P $(daemon-pid) . || true
 	[ -f $(pidfile) ] && $(daemon) --stop && sleep 0.1 || true
-	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
-	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
-	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
-	[ -f $(pidfile) ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -9    -P $(daemon-pid) . || true
+	[ -f $(pidfile) -a "$(daemon-pid)" ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) -a "$(daemon-pid)" ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) -a "$(daemon-pid)" ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -TERM -P $(daemon-pid) . || true
+	[ -f $(pidfile) -a "$(daemon-pid)" ] && $(sudoUser) pkill -0 -P $(daemon-pid) . && sleep 1 && $(sudoUser) pkill -9    -P $(daemon-pid) . || true
 	[ -f $(pidfile) ] && $(sudoUser) pkill -9 -F $(pidfile) || true
 endif 
         # Tell jhournald to stop, then make it stop.

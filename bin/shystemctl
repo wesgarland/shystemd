@@ -49,9 +49,11 @@ EOF
     dry-run)
       export SHYSTEMD_DRY_RUN=1
       export SHYSTEMD_DEBUG=1
+      export SHYSTEMD_VERBOSE=1
       ;;
     debug)
       export SHYSTEMD_DEBUG=1
+      export SHYSTEMD_VERBOSE=1
       ;;
     j|parallelism)
       export SHYSTEMD_PARALLELISM="$OPTARG"

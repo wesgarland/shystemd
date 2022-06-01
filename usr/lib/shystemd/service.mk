@@ -204,7 +204,9 @@ endif #Unit_ConditionPathExists
 # and instance which monitors jhournald if this service is configured ot used the journal.
 #
 start: $(start-deps)
-	@[ "$(SHYSTEMD_VERBOSE)" ] && echo Starting unit $(unit)
+ifdef SHYSTEMD_VERBOSE
+	@echo Starting unit $(unit)
+endif
 	$(launch) -- $(Service_ExecStart)
 ifeq ($(Service_RemainAfterExit),yes)
 	$(touch) $(scratchDir)/$(unit).ran
@@ -218,7 +220,9 @@ stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 #   rather than the pid that $(daemon) was launched as
 stop: daemon-pid=$(shell head -1 $(pidfile) 2>/dev/null)
 stop: $(stop-deps)
-	@[ "$(SHYSTEMD_VERBOSE)" ] && echo Stopping unit $(unit)
+ifdef SHYSTEMD_VERBOSE
+	@echo Stopping unit $(unit)
+endif
 	$(rm) -f $(scratchDir)/$(unit).ran
 ifeq ($(Service_Type),forking) 
         # service-managed pid file, daemon has already exited

@@ -13,7 +13,7 @@
 
 cd `dirname "$0"`
 [ "${SHYSTEMD_BIN_DIR}" ] || export SHYSTEMD_BIN_DIR=`pwd`
-cd "${SHYSTEMD_BIN_DIR}"/..
+cd "${SHYSTEMD_BIN_DIR}"/.. || exit 2
 . etc/shystemd/default-env.incl
 argv="$@"
 

@@ -31,4 +31,8 @@ fi
 
 if [ ! "${SHYSTEMD_DEBUG}" ]; then
   make+=" -s"
+else
+  if [ "${SHYSTEMD_VERBOSE}" ]; then
+    make+=" -d"
+  fi
 fi

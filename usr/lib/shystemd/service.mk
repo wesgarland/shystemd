@@ -281,7 +281,7 @@ endif
 # Start the journal if it is not running - jhournald reads the output pipe, adds
 # a synthetic timestamp and pid, and writes to the .journal file.
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).$(journal_ext)
-	$(sudoUser) $(daemonCmd) -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --running ||\
+	$(sudoUser) $(daemonCmd) -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) --running || \
 	$(sudoUser) $(daemonCmd) -n jhournald-$(unit_prefix) -NUF $(journal-pidfile) $(daemon-opts) \
 	  --stdout=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stdout \
 	  --stderr=$(JHOURNALD_LOG_DIR)/jhournald-$(unit_prefix).stderr \

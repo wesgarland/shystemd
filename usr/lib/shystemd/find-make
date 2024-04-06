@@ -7,7 +7,7 @@
 # @date         Feb 2022
 #
 [ ! "$make" ] && make=`locate gmake`
-[ ! "$make" ] && make=`make make`
+[ ! "$make" ] && make=`locate make`
 
 if [[ `$make --version | grep '^GNU Make' | head -1` =~ (GNU Make *)([0-9]*).([0-9]*) ]]; then
   if [ "${BASH_REMATCH[2]}" -lt "3" ]; then

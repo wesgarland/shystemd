@@ -24,7 +24,7 @@ pager()
 
 rcat()
 {
-  if locate rcat; then
+  if locate rcat >/dev/null; then
     rcat $@
   else
     tail -r $@

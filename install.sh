@@ -57,7 +57,7 @@ xcopy()
   find "$src" -type f \
   | egrep -v '~$' \
   | $tar -cf - -T - \
-  | (cd "$target" && $tar -xf -)
+  | (cd "$target" && $tar --overwrite -xf -)
 }
 
 # Main Program Entry Point

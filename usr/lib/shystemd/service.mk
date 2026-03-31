@@ -38,9 +38,6 @@ DAEMON_VER:=$(shell daemon --version | sed -e 's/daemon-//' -e 's/\./ /g')
 DAEMON_MAJ_VER:=$(word 1,$(DAEMON_VER))
 DAEMON_MIN_VER:=$(word 2,$(DAEMON_VER))
 DAEMON_REV_VER:=$(word 3,$(DAEMON_VER))
-ifneq (06,$(DAEMON_MAJ_VER)$(DAEMON_MIN_VER))
-  daemonCmd += --ignore-eof
-endif
 
 # Permissions for running daemon. If we are not already running as the unit's
 # correct user, the variables sudoRoot and sudoUser are defined, otherwise blank.

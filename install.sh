@@ -26,6 +26,7 @@ cd "${SHYSTEMD_PREFIX}" || exit 1
 SHYSTEMD_PREFIX="`pwd`"
 
 cd "${myDir}"
+callerJournalDir="${JHOURNALD_LOG_DIR}"
 . usr/lib/shystemd/locate
 . etc/shystemd/default-env.incl
 
@@ -92,14 +93,23 @@ mv range-find/range-find bin
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
 
+# Journals go where the caller says; otherwise in the LSB log directory for a system install,
+# or beside the install for any other prefix
+if [ "${callerJournalDir}" ]; then
+  JHOURNALD_LOG_DIR="${callerJournalDir}"
+elif [ "${SHYSTEMD_PREFIX}" = "/" ]; then
+  JHOURNALD_LOG_DIR="/var/log/shystemd/journals"
+else
+  JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/shystemd-journals"
+fi
+
 # Build a local config describing this install
-[ ! "${JHOURNALD_LOG_DIR}" ] && JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
 cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF1
 [ "\${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX="${SHYSTEMD_PREFIX}"
 export JHOURNALD_LOG_DIR="${JHOURNALD_LOG_DIR}"
 EOF1
-echo mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
-mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
+echo mkdir -m1777 -p "${JHOURNALD_LOG_DIR}"
+mkdir -m1777 -p "${JHOURNALD_LOG_DIR}"
 
 if [ "${LAYOUT}" = "LSB" ]; then
   xcopy usr "${SHYSTEMD_PREFIX}"

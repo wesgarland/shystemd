@@ -26,6 +26,7 @@ cd "${SHYSTEMD_PREFIX}" || exit 1
 SHYSTEMD_PREFIX="`pwd`"
 
 cd "${myDir}"
+callerJournalDir="${JHOURNALD_LOG_DIR}"
 . usr/lib/shystemd/locate
 . etc/shystemd/default-env.incl
 
@@ -57,7 +58,7 @@ xcopy()
   find "$src" -type f \
   | egrep -v '~$' \
   | $tar -cf - -T - \
-  | (cd "$target" && $tar --overwrite -xf -)
+  | (cd "$target" && $tar --overwrite --no-same-owner --no-same-permissions -xf -)
 }
 
 # Main Program Entry Point
@@ -92,14 +93,33 @@ mv range-find/range-find bin
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
 
+# The front ends find the install from SHYSTEMD_BIN_DIR, which defaults to the directory they
+# run from. Record the installed bin directory instead, since a front end can be run from
+# elsewhere, e.g. /usr/bin/systemctl when /bin is a symlink to usr/bin.
+binDir="${SHYSTEMD_PREFIX%/}/bin"
+for frontEnd in shystemctl jhournalctl jhournald
+do
+  sed -e "s;SHYSTEMD_BIN_DIR=\`pwd\`;SHYSTEMD_BIN_DIR=\"${binDir}\";" \
+    "${myDir}/bin/${frontEnd}" > "${binDir}/${frontEnd}"
+done
+
+# Journals go where the caller says; otherwise in the LSB log directory for a system install,
+# or beside the install for any other prefix
+if [ "${callerJournalDir}" ]; then
+  JHOURNALD_LOG_DIR="${callerJournalDir}"
+elif [ "${SHYSTEMD_PREFIX}" = "/" ]; then
+  JHOURNALD_LOG_DIR="/var/log/shystemd/journals"
+else
+  JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/shystemd-journals"
+fi
+
 # Build a local config describing this install
-[ ! "${JHOURNALD_LOG_DIR}" ] && JHOURNALD_LOG_DIR="${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
 cat > "${SHYSTEMD_PREFIX}/etc/shystemd/local-env.incl" <<EOF1
 [ "\${SHYSTEMD_PREFIX}" ] || SHYSTEMD_PREFIX="${SHYSTEMD_PREFIX}"
 export JHOURNALD_LOG_DIR="${JHOURNALD_LOG_DIR}"
 EOF1
-echo mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
-mkdir -m1777 -p "${SHYSTEMD_PREFIX}/var/log/shystemd/journals"
+echo mkdir -m1777 -p "${JHOURNALD_LOG_DIR}"
+mkdir -m1777 -p "${JHOURNALD_LOG_DIR}"
 
 if [ "${LAYOUT}" = "LSB" ]; then
   xcopy usr "${SHYSTEMD_PREFIX}"

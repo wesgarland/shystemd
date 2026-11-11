@@ -24,6 +24,12 @@ cd `dirname "$0"`
 [ "${SHYSTEMD_BIN_DIR}" ] || export SHYSTEMD_BIN_DIR=`pwd`
 cd "${SHYSTEMD_BIN_DIR}"/..
 . etc/shystemd/default-env.incl
+
+# Page only when writing to a terminal, like journalctl
+if [ ! -t 1 ]; then
+  export SHYSTEMD_PAGER=cat
+  export SYSTEMD_PAGER=cat
+fi
 argv="$@"
 
 name=""

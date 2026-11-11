@@ -26,7 +26,7 @@ include $(SHYSTEMD_ETC_DIR)/system-unit-defaults.mk
 unescape = $(shell printf -- '$(1)' | sed 's;-;/;g')
 
 # Basic parameters for running daemon
-daemon=$(sudoRoot) $(daemonCmd) -n $(unit) -NU
+daemon=$(sudoRoot) $(userEnv) $(daemonCmd) -n $(unit) -NU
 pidfile = $(scratchDir)/$(unit).pid
 journal-pidfile = $(scratchDir)/journal-$(unit).pid
 
@@ -44,6 +44,9 @@ DAEMON_REV_VER:=$(word 3,$(DAEMON_VER))
 # sudoUser is the sudo command to become the unit's user. sudoRoot is the sudo
 # command to become root, the command using sudoRoot must drop perms itself.
 ifdef Service_User
+  # Like systemd, a User= unit gets that user's HOME, USER and LOGNAME, not the caller's.
+  # They are set in the environment daemon starts with, which the unit inherits.
+  userEnv=env HOME=$(shell echo ~$(Service_User)) USER=$(Service_User) LOGNAME=$(Service_User)
   ifneq ($(Service_User),$(shell whoami)) 
     sudoUser=sudo -E --user=$(Service_User)
     sudoRoot=sudo -E
@@ -289,7 +292,7 @@ else
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log $(JHOURNALD_LOG_DIR)
 	@true
 $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
-	@date >> $@
+	@$(sudoUser) sh -c 'date >> "$@"'
 endif # DISABLE_JHOURNALD
 
 ###############################################################################

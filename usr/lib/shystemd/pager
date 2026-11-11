@@ -13,10 +13,11 @@ else
   SYSTEMD_PAGER="less"
 fi
 
+# Page only when writing to a terminal, like systemctl
 pager()
 {
-  if [ "${SYSTEMD_PAGER}" = "cat" ]; then
-    LC_CTYPE="${SYSTEMD_LESSCHARSET:-utf-8}" cat $*
+  if [ ! -t 1 ] || [ "${SYSTEMD_PAGER}" = "cat" ]; then
+    cat $*
   else 
     LESSCHARSET="${SYSTEMD_LESSCHARSET:-utf-8}" "${SYSTEMD_PAGER}" ${SYSTEMD_LESS:--FRSXMK} $*
   fi

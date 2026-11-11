@@ -93,6 +93,16 @@ mv range-find/range-find bin
 xcopy etc "${SHYSTEMD_PREFIX}"
 xcopy bin "${SHYSTEMD_PREFIX}"
 
+# The front ends find the install from SHYSTEMD_BIN_DIR, which defaults to the directory they
+# run from. Record the installed bin directory instead, since a front end can be run from
+# elsewhere, e.g. /usr/bin/systemctl when /bin is a symlink to usr/bin.
+binDir="${SHYSTEMD_PREFIX%/}/bin"
+for frontEnd in shystemctl jhournalctl jhournald
+do
+  sed -e "s;SHYSTEMD_BIN_DIR=\`pwd\`;SHYSTEMD_BIN_DIR=\"${binDir}\";" \
+    "${myDir}/bin/${frontEnd}" > "${binDir}/${frontEnd}"
+done
+
 # Journals go where the caller says; otherwise in the LSB log directory for a system install,
 # or beside the install for any other prefix
 if [ "${callerJournalDir}" ]; then

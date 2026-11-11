@@ -136,7 +136,7 @@ grey='\e[38;5;247m'
 normal='\e[0m'
 function error()
 {
-  printf "%s%s%s\n" "$red" "$1" "$normal"
+  printf "%b%s%b\n" "$red" "$1" "$normal"
 }
 
 # Journals carry timestamps for merging; plain logs (jhournald disabled) do not

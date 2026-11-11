@@ -289,7 +289,7 @@ else
 start-journal: $(JHOURNALD_LOG_DIR)/$(unit_prefix).log $(JHOURNALD_LOG_DIR)
 	@true
 $(JHOURNALD_LOG_DIR)/$(unit_prefix).log: $(JHOURNALD_LOG_DIR)
-	@date >> $@
+	@$(sudoUser) sh -c 'date >> "$@"'
 endif # DISABLE_JHOURNALD
 
 ###############################################################################

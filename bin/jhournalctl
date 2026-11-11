@@ -14,6 +14,12 @@ cd `dirname "$0"`
 cd "${SHYSTEMD_BIN_DIR}"/..
 . etc/shystemd/default-env.incl
 
+# Page only when writing to a terminal, like journalctl
+if [ ! -t 1 ]; then
+  export SHYSTEMD_PAGER=cat
+  export SYSTEMD_PAGER=cat
+fi
+
 units=()
 
 # Need to process arguments before most libraries load

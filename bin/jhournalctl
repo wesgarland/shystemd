@@ -139,10 +139,19 @@ function error()
   printf "%s%s%s\n" "$red" "$1" "$normal"
 }
 
+# Journals carry timestamps for merging; plain logs (jhournald disabled) do not
+if [ "${DISABLE_JHOURNALD}" ]; then
+  log_ext=log
+else
+  log_ext=journal
+fi
+
 function merge()
 {
-  if [ "$2" ]; then
+  if [ "$2" ] && [ "${log_ext}" = "journal" ]; then
     sort -n --merge -- "$@"
+  elif [ "$2" ]; then
+    cat -- "$@"
   else
     cat "$1"
   fi
@@ -152,11 +161,11 @@ function merge()
 . "${SHYSTEMD_LIB_DIR}"/for-each-unit
 echoAlways()
 {
-  echo "${JHOURNALD_LOG_DIR}/${1}.journal"
+  echo "${JHOURNALD_LOG_DIR}/${1}.${log_ext}"
 }
 echoIfExists()
 {
-  log="${JHOURNALD_LOG_DIR}/${1}.journal"
+  log="${JHOURNALD_LOG_DIR}/${1}.${log_ext}"
   [ -e "$log" ] && echo "$log"
 }
 [ "$units" ] || units='*'
@@ -170,6 +179,11 @@ if [ ${#allLogs[@]} = 0 ]; then
 fi
 
 . "${SHYSTEMD_LIB_DIR}"/parse-date
+
+if [ "${log_ext}" = "log" ] && ( [ "${since}" ] || [ "${until}" ] ); then
+  error "--since and --until need jhournald; logs have no timestamps when DISABLE_JHOURNALD is set"
+  exit 1
+fi
 
 # Extract the ranges described in the command line options from the log files and merge them
 (
